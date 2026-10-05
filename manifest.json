@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
   "description": "Track your time in seconds and get automatic totals, comparisons, goals and charts. Local-first, with a Simple and an Advanced view.",
-  "author": "My Tracker",
+  "author": "Ansu Samanta",
+  "authorUrl": "https://github.com/samantaansu2010",
   "isDesktopOnly": false
 }
+
+
+
