@@ -1,7 +1,7 @@
 {
   "id": "my-tracker",
   "name": "My Tracker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minAppVersion": "1.7.2",
   "description": "Track your time in seconds and get automatic totals, comparisons, goals and charts. Local-first, with a Simple and an Advanced view.",
   "author": "Ansu Samanta",
