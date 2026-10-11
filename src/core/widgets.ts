@@ -8,6 +8,7 @@ export type WidgetGroup = "Overview" | "Charts" | "Analysis";
 export interface WidgetDef { id: string; label: string; group: WidgetGroup; description: string; simple: boolean; advanced: boolean }
 
 export const WIDGETS: WidgetDef[] = [
+  { id: "overview", label: "Overview", group: "Overview", description: "Total time with change against the previous period and a trend line", simple: false, advanced: true },
   { id: "today", label: "Today", group: "Overview", description: "Time tracked today, your streak and goal progress", simple: true, advanced: true },
   { id: "week", label: "This week", group: "Overview", description: "Colourful day-by-day bars for the current week", simple: true, advanced: true },
   { id: "goals", label: "Goals", group: "Overview", description: "Progress towards the targets you set", simple: true, advanced: true },
@@ -18,10 +19,15 @@ export const WIDGETS: WidgetDef[] = [
   { id: "chartActivity", label: "Activity over time", group: "Charts", description: "Daily, weekly or monthly bars with a moving average", simple: false, advanced: true },
   { id: "chartWeekly", label: "Weekly activity", group: "Charts", description: "The last 12 weeks", simple: false, advanced: true },
   { id: "chartMonthly", label: "Monthly activity", group: "Charts", description: "The last 12 months", simple: false, advanced: true },
-  { id: "chartDistribution", label: "Distribution", group: "Charts", description: "Share of time per category and subject", simple: false, advanced: true },
+  { id: "chartDistribution", label: "Distribution", group: "Charts", description: "Share of time per category and subject (the Time distribution chart shows this too)", simple: false, advanced: false },
   { id: "chartCumulative", label: "Cumulative time", group: "Charts", description: "Running total, this period against the previous one", simple: false, advanced: true },
+  { id: "heatmap", label: "Activity heatmap", group: "Charts", description: "A calendar of active days, darker for more time", simple: false, advanced: true },
+  { id: "composition", label: "Time distribution", group: "Charts", description: "Donut of time per category, with hover to focus a category", simple: false, advanced: true },
   { id: "chartPlanned", label: "Planned vs actual", group: "Charts", description: "Sessions that had a planned time", simple: false, advanced: true },
   { id: "keyNumbers", label: "Key numbers", group: "Analysis", description: "Consistency, averages, median, gaps, trend and more", simple: false, advanced: true },
+  { id: "insights", label: "Insights", group: "Analysis", description: "Plain-language findings that the data supports", simple: false, advanced: true },
+  { id: "sessionLength", label: "Session length", group: "Analysis", description: "Average, median, longest and shortest, plus a distribution chart", simple: false, advanced: true },
+  { id: "subjectCompare", label: "Subject comparison", group: "Analysis", description: "Ranked subjects with change against the previous period and drill-down", simple: false, advanced: true },
   { id: "longestSessions", label: "Longest sessions", group: "Analysis", description: "Your five longest sessions in the range", simple: false, advanced: true },
   { id: "longestGaps", label: "Longest gaps", group: "Analysis", description: "Longest stretches without activity", simple: false, advanced: true },
   { id: "peaks", label: "Peaks", group: "Analysis", description: "Best day, weekday and time of day", simple: false, advanced: true },
@@ -30,7 +36,7 @@ export const WIDGETS: WidgetDef[] = [
 ];
 
 export const SIMPLE_ORDER = ["today", "week", "goals", "comparison", "breakdown", "attention"];
-export const ADVANCED_ORDER = ["today", "recent", "attention", "goals", "breakdown", "week", "comparison", "keyNumbers", "chartActivity", "chartWeekly", "chartMonthly", "chartDistribution", "chartCumulative", "chartPlanned", "longestSessions", "longestGaps", "peaks", "results", "recall"];
+export const ADVANCED_ORDER = ["overview", "today", "insights", "chartActivity", "heatmap", "subjectCompare", "composition", "sessionLength", "goals", "attention", "comparison", "keyNumbers", "breakdown", "week", "recent", "chartWeekly", "chartMonthly", "chartDistribution", "chartCumulative", "chartPlanned", "longestSessions", "longestGaps", "peaks", "results", "recall"];
 
 export type Visibility = Record<ViewMode, Record<string, boolean>>;
 

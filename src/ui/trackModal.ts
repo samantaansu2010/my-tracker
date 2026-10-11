@@ -1,3 +1,4 @@
+import { renderRecentChips } from "./recentChips";
 import { Modal, Notice } from "obsidian";
 import type { TrackerHost } from "../host";
 import type { TrackerEvent } from "../core/types";
@@ -30,6 +31,7 @@ export class TrackModal extends Modal {
       this.suggestEl = contentEl.createDiv({ cls: "mt-suggest", attr: { role: "listbox" } });
       this.quick.addEventListener("input", () => { this.reparse(); this.updateSuggest(); });
       this.quick.addEventListener("keydown", (e) => this.onQuickKey(e));
+      renderRecentChips(contentEl, this.host, () => this.close());
       window.setTimeout(() => this.quick.focus(), 0);
     }
     this.previewEl = contentEl.createDiv({ cls: "mt-preview", attr: { "aria-live": "polite" } });

@@ -1,3 +1,4 @@
+import { AnalysisView, ANALYSIS_VIEW_TYPE } from "./ui/analysisView";
 import { Notice, Plugin, normalizePath, requestUrl, TFile } from "obsidian";
 import type { TrackerHost, TrackerPaths } from "./host";
 import type { TrackerEvent, TrackerSettings } from "./core/types";
@@ -33,6 +34,7 @@ export default class MyTrackerPlugin extends Plugin implements TrackerHost {
     this.bindStore();
 
     this.registerView(VIEW_TYPE, (leaf) => new DashboardView(leaf, this));
+    this.registerView(ANALYSIS_VIEW_TYPE, (leaf) => new AnalysisView(leaf, this));
     this.addRibbonIcon("bar-chart-3", "My Tracker: Open dashboard", () => void this.openDashboard());
     this.addSettingTab(new TrackerSettingTab(this));
     this.registerMarkdownCodeBlockProcessor("my-tracker", (src, el, ctx) => renderCodeBlock(this, src, el, ctx));
@@ -41,6 +43,7 @@ export default class MyTrackerPlugin extends Plugin implements TrackerHost {
       this.addCommand({ id, name, callback: () => { if (needsSetup && !this.ensureReady()) return; void fn(); } });
     cmd("track-activity", "Track Activity", () => this.openTrack());
     cmd("open-dashboard", "Open dashboard", () => this.openDashboard());
+    cmd("open-analysis", "Open analysis (Advanced dashboard)", () => this.openAnalysis());
     cmd("quick-query", "Ask a question (e.g. “Math this month”)", () => new QueryModal(this).open());
     cmd("undo-last", "Undo last change", () => this.undoLast());
     cmd("generate-report", "Generate report", () => new RangePicker(this, (id) => void this.generateReport(id)).open());
@@ -129,6 +132,12 @@ export default class MyTrackerPlugin extends Plugin implements TrackerHost {
     const leaf = ws.getLeaf("tab");
     await leaf.setViewState({ type: VIEW_TYPE, active: true });
     void ws.revealLeaf(leaf);
+  }
+
+  /** Analysis lives in the Advanced dashboard now: switch to it and open (or reveal) the dashboard. */
+  async openAnalysis(): Promise<void> {
+    if (this.settings.dashboard.mode !== "advanced") { this.settings.dashboard.mode = "advanced"; await this.saveSettings(); }
+    await this.openDashboard();
   }
 
   async undoLast(): Promise<void> {

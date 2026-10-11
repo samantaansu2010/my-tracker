@@ -16,7 +16,9 @@ export interface TrackerHost {
   today(): string;
   resolveOpts(): ResolveOpts;
   openTrack(event?: TrackerEvent): void;
+  openAnalysis(): Promise<void>;
   openDrill(title: string, query: () => TrackerEvent[]): void;
+
   syncActivityWatch(notify?: boolean): Promise<void>;
   testActivityWatch(): Promise<void>;
   exportData(kind: "json" | "csv"): Promise<void>;

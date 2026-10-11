@@ -12,11 +12,14 @@ test("every widget id is unique and appears in the display order of the mode(s) 
   assert.deepEqual([...ids].sort(), [...ADVANCED_ORDER].sort());
   for (const id of SIMPLE_ORDER) assert.ok(ids.includes(id), id);
 });
-test("simple view is genuinely smaller than advanced by default, and advanced shows everything", () => {
+test("simple view is genuinely smaller than advanced by default, and advanced shows everything except the old Distribution list", () => {
   const v = defaultVisibility();
   const count = (m: "simple" | "advanced") => Object.values(v[m]).filter(Boolean).length;
   assert.ok(count("simple") <= 7 && count("simple") < count("advanced"));
-  assert.equal(count("advanced"), WIDGETS.length);
+  const optional = ["chartDistribution"];
+  assert.equal(count("advanced"), WIDGETS.length - optional.length);
+  for (const id of optional) assert.equal(v.advanced[id], false, id); // the Time distribution donut replaces it
+  for (const id of ["overview", "heatmap", "insights", "sessionLength", "subjectCompare", "composition"]) assert.equal(v.advanced[id], true, id);
   for (const id of ["today", "week", "goals"]) assert.ok(v.simple[id], id);
   for (const id of ["keyNumbers", "chartCumulative", "longestSessions", "peaks", "recall"]) assert.ok(!v.simple[id] && v.advanced[id], id);
 });

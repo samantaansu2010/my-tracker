@@ -1,8 +1,16 @@
-/** Small dependency-free SVG/HTML charts. Everything is keyboard-focusable and has text alternatives. */
+
+/** Small dependency-free SVG/HTML charts.
+ * Everything is keyboard-focusable and has text alternatives. */
 import { formatDuration } from "../core/duration";
+import { attachTip, type TipRow } from "./tooltip";
 
 const NS = "http://www.w3.org/2000/svg";
-function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}, parent?: Element): SVGElementTagNameMap[K] {
+
+export function svg<K extends keyof SVGElementTagNameMap>(
+  tag: K,
+  attrs: Record<string, string | number> = {},
+  parent?: Element
+): SVGElementTagNameMap[K] {
   const el = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
   parent?.appendChild(el);
@@ -10,7 +18,7 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
 }
 
 /** Redraws whenever the container is resized, so text stays at a readable size. */
-function responsive(parent: HTMLElement, draw: (width: number) => SVGElement): void {
+export function responsive(parent: HTMLElement, draw: (width: number) => SVGElement): void {
   const host = parent.createDiv({ cls: "mt-chart" });
   const render = () => { const w = Math.max(240, Math.floor(host.clientWidth || 600)); host.empty(); host.appendChild(draw(w)); };
   render();
@@ -32,80 +40,137 @@ export function axisMax(maxMinutes: number): number {
   return maxMinutes >= 120 ? niceMax(maxMinutes / 60) * 60 : niceMax(maxMinutes);
 }
 
+let uid = 0;
 export interface BarPart { value: number; color: string; name: string }
-export interface BarItem { label: string; value: number; key: string; title: string; parts?: BarPart[] }
-export function barChart(parent: HTMLElement, o: { items: BarItem[]; line?: (number | null)[]; lineLabel?: string; height?: number; aria: string; fmt?: (n: number) => string; onSelect?: (item: BarItem) => void }): void {
+export interface BarItem {
+  label: string; value: number; key: string; title: string; parts?: BarPart[];
+  /** tooltip heading (a readable date); falls back to the axis label */
+  heading?: string; sub?: string;
+  /** the same position in the previous period, drawn as a tick on the bar; null = no data for it */
+  ghost?: number | null;
+}
+export interface BarOpts {
+  items: BarItem[]; line?: (number | null)[]; lineLabel?: string; ghostLabel?: string; height?: number; aria: string;
+  fmt?: (n: number) => string; onSelect?: (item: BarItem) => void;
+}
+
+/**
+ * Stacked bars with rounded tops, a hover column that shows a styled tooltip (per-part breakdown, total, moving average,
+ * previous period), previous-period ticks and a smoothed average line. Days without activity keep a faint baseline mark
+ * so a quiet day reads as "nothing here", not as a drawing defect.
+ */
+export function barChart(parent: HTMLElement, o: BarOpts): void {
   const fmt = o.fmt ?? formatDuration;
-  const H = o.height ?? 150;
+  const H = o.height ?? 200;
   if (!o.items.length) { parent.createDiv({ cls: "mt-empty", text: "No data in this range." }); return; }
   responsive(parent, (w) => {
-    const padL = 46, padR = 4, padT = 8, padB = 20, plotW = w - padL - padR, plotH = H - padT - padB, n = o.items.length;
-    const raw = Math.max(0, ...o.items.map((i) => i.value), ...(o.line ?? []).map((v) => v ?? 0));
+    const padL = 44, padR = 4, padT = 12, padB = 24, plotW = w - padL - padR, plotH = H - padT - padB, n = o.items.length;
+    const raw = Math.max(0, ...o.items.map((i) => i.value), ...(o.line ?? []).map((v) => v ?? 0), ...o.items.map((i) => i.ghost ?? 0));
     const max = axisMax(raw > 0 ? raw : 60);
     const el = svg("svg", { viewBox: `0 0 ${w} ${H}`, width: "100%", height: H, role: "img", "aria-label": o.aria, class: "mt-svg" });
     for (const f of [0, 0.5, 1]) {
       const y = padT + plotH * (1 - f);
-      svg("line", { x1: padL, x2: w - padR, y1: y, y2: y, class: "mt-grid" }, el);
-      svg("text", { x: padL - 6, y: y + 4, "text-anchor": "end", class: "mt-axis" }, el).textContent = f === 0 ? "0" : fmt(max * f);
+      svg("line", { x1: padL, x2: w - padR, y1: y, y2: y, class: f === 0 ? "mt-grid is-base" : "mt-grid" }, el);
+      svg("text", { x: padL - 8, y: y + 3.5, "text-anchor": "end", class: "mt-axis" }, el).textContent = f === 0 ? "0" : fmt(max * f);
     }
-    const bw = plotW / n, gap = Math.min(2, bw * 0.15);
+    const bw = plotW / n, bwid = Math.max(2, Math.min(34, bw - Math.min(4, bw * 0.22))), idBase = `mtc${++uid}`;
     o.items.forEach((it, i) => {
-      const x = padL + i * bw + gap / 2, bwid = Math.max(1, bw - gap);
-      const cls = "mt-bar" + (o.onSelect ? " mt-clickable" : "");
-      const g = svg("g", { class: cls }, el);
-      let yy = padT + plotH;
-      const parts = it.parts && it.parts.length ? it.parts : [{ value: it.value, color: "", name: "" }];
-      parts.forEach((pt, k) => {
-        const hh = Math.max((pt.value / max) * plotH, pt.value > 0 ? 1 : 0);
-        yy -= hh;
-        const rect = svg("rect", { x, y: yy, width: bwid, height: hh, rx: k === parts.length - 1 && bwid > 6 ? 2 : 0, class: pt.color ? "mt-bar-part" : "mt-bar-solid" }, g);
-        if (pt.color) rect.setAttribute("style", `fill:${pt.color}`);
-      });
-      const r = g;
-      svg("title", {}, r).textContent = it.title;
-      if (o.onSelect) {
-        r.setAttribute("tabindex", "0"); r.setAttribute("role", "button"); r.setAttribute("aria-label", it.title);
-        r.addEventListener("click", () => o.onSelect!(it));
-        r.addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter" || (e as KeyboardEvent).key === " ") { e.preventDefault(); o.onSelect!(it); } });
+      const cx = padL + i * bw + bw / 2, x = cx - bwid / 2, base = padT + plotH;
+      const g = svg("g", { class: "mt-col" + (o.onSelect ? " mt-clickable" : "") }, el);
+      svg("rect", { x: padL + i * bw, y: padT, width: bw, height: plotH, rx: 4, class: "mt-hit" }, g);
+      const parts = (it.parts ?? []).filter((p) => p.value > 0);
+      const heights = (parts.length ? parts : [{ value: it.value, color: "", name: "" }]).map((p) => (p.value / max) * plotH);
+      const fullH = it.value > 0 ? Math.max(2, heights.reduce((a, b) => a + b, 0)) : 0;
+      if (fullH > 0) {
+        const clip = svg("clipPath", { id: `${idBase}-${i}` }, g);
+        svg("rect", { x, y: base - fullH, width: bwid, height: fullH, rx: Math.min(4, bwid / 2) }, clip);
+        const stack = svg("g", { "clip-path": `url(#${idBase}-${i})` }, g);
+        let yy = base;
+        (parts.length ? parts : [{ value: it.value, color: "", name: "" }]).forEach((pt, k) => {
+          const hh = Math.max(heights[k], 1);
+          yy -= hh;
+          const rect = svg("rect", { x, y: yy, width: bwid, height: hh, class: pt.color ? "mt-bar-part" : "mt-bar-solid" }, stack);
+          if (pt.color) rect.setAttribute("style", `fill:${pt.color}`);
+        });
+      } else svg("rect", { x: cx - Math.min(bwid, 10) / 2, y: base - 2, width: Math.min(bwid, 10), height: 2, rx: 1, class: "mt-bar-zero" }, g);
+      if (it.ghost !== null && it.ghost !== undefined && it.ghost > 0) {
+        const gy = base - (it.ghost / max) * plotH;
+        svg("line", { x1: cx - bwid / 2 - 2, x2: cx + bwid / 2 + 2, y1: gy, y2: gy, class: "mt-ghost-tick" }, g);
       }
+      attachTip(g, () => {
+        const rows: TipRow[] = parts.slice().sort((a, b) => b.value - a.value).map((p) => ({ label: p.name || "Time", value: fmt(p.value), color: p.color || undefined }));
+        if (parts.length > 1) rows.push({ label: "Total", value: fmt(it.value), strong: true });
+        const avg = o.line?.[i];
+        if (avg !== null && avg !== undefined) rows.push({ label: o.lineLabel ?? "Moving average", value: fmt(avg), muted: true });
+        if (it.ghost !== null && it.ghost !== undefined) rows.push({ label: o.ghostLabel ?? "Previous period", value: it.ghost > 0 ? fmt(it.ghost) : "none", muted: true });
+        return { title: it.heading ?? it.label, sub: it.value > 0 ? it.sub : "No activity", rows: it.value > 0 ? rows : rows.filter((r) => r.muted) };
+      });
+      if (o.onSelect) {
+        g.setAttribute("tabindex", "0"); g.setAttribute("role", "button"); g.setAttribute("aria-label", it.title);
+        g.addEventListener("click", () => o.onSelect!(it));
+        g.addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter" || (e as KeyboardEvent).key === " ") { e.preventDefault(); o.onSelect!(it); } });
+      } else g.setAttribute("aria-label", it.title);
     });
-    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / 56))));
-    o.items.forEach((it, i) => { if (i % every === 0) svg("text", { x: padL + i * bw + bw / 2, y: H - 5, "text-anchor": "middle", class: "mt-axis" }, el).textContent = it.label; });
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / 64))));
+    o.items.forEach((it, i) => { if (i % every === 0) svg("text", { x: padL + i * bw + bw / 2, y: H - 6, "text-anchor": "middle", class: "mt-axis" }, el).textContent = it.label; });
     if (o.line) {
       let d = "";
-      o.line.forEach((v, i) => { if (v === null) return; d += `${d ? "L" : "M"}${padL + i * bw + bw / 2},${padT + plotH - (v / max) * plotH} `; });
-      if (d) { const p = svg("path", { d, class: "mt-line" }, el); svg("title", {}, p).textContent = o.lineLabel ?? "Moving average"; }
+      o.line.forEach((v, i) => { if (v === null) return; d += `${d ? "L" : "M"}${(padL + i * bw + bw / 2).toFixed(1)},${(padT + plotH - (v / max) * plotH).toFixed(1)} `; });
+      if (d) { svg("path", { d, class: "mt-line-halo" }, el); svg("path", { d, class: "mt-line" }, el); }
     }
+    return el;
+  });
+}
+
+/** A tiny trend line for hero numbers: no axes, just the shape. Renders nothing when there is no shape to show. */
+export function sparkline(parent: HTMLElement, values: number[], o: { height?: number; aria: string }): void {
+  if (values.length < 2 || values.filter((v) => v > 0).length < 2) return;   // one active period is a point, not a trend
+  const H = o.height ?? 44;
+  responsive(parent, (w) => {
+    const max = Math.max(...values), padY = 4, plotH = H - padY * 2, step = w / (values.length - 1);
+    const pts = values.map((v, i) => [i * step, padY + plotH - (v / max) * plotH] as const);
+    const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    const el = svg("svg", { viewBox: `0 0 ${w} ${H}`, width: "100%", height: H, role: "img", "aria-label": o.aria, class: "mt-svg mt-spark" });
+    svg("path", { d: `${line} L${w},${H} L0,${H} Z`, class: "mt-spark-area" }, el);
+    svg("path", { d: line, class: "mt-spark-line" }, el);
+    const last = pts[pts.length - 1];
+    svg("circle", { cx: last[0] - 2, cy: last[1], r: 3, class: "mt-spark-dot" }, el);
     return el;
   });
 }
 
 export interface LineSeries { name: string; values: (number | null)[]; cls: "mt-line" | "mt-line-prev" }
 export function lineChart(parent: HTMLElement, o: { series: LineSeries[]; xLabel: (i: number) => string; height?: number; aria: string; fmt?: (n: number) => string }): void {
-  const fmt = o.fmt ?? formatDuration, H = o.height ?? 160;
+  const fmt = o.fmt ?? formatDuration, H = o.height ?? 170;
   const n = Math.max(0, ...o.series.map((s) => s.values.length));
   if (!n) { parent.createDiv({ cls: "mt-empty", text: "No data in this range." }); return; }
   const legend = parent.createDiv({ cls: "mt-legend" });
   for (const s of o.series) { const li = legend.createSpan({ cls: "mt-legend-item" }); li.createSpan({ cls: `mt-swatch ${s.cls}` }); li.createSpan({ text: s.name }); }
   responsive(parent, (w) => {
-    const padL = 46, padR = 8, padT = 8, padB = 20, plotW = w - padL - padR, plotH = H - padT - padB;
+    const padL = 44, padR = 8, padT = 12, padB = 24, plotW = w - padL - padR, plotH = H - padT - padB;
     const raw = Math.max(0, ...o.series.flatMap((s) => s.values.map((v) => v ?? 0)));
     const max = axisMax(raw > 0 ? raw : 60);
-    const el = svg("svg", { viewBox: `0 0 ${w} ${H}`, width: "100%", height: H, role: "img", "aria-label": o.aria, class: "mt-svg" });
+    const el = svg("svg", { viewBox: `0 0 ${w} ${H}`, width: "100%", height: H, role: "img", "aria-label": o.aria, class: "mt-svg mt-linechart" });
     for (const f of [0, 0.5, 1]) {
       const y = padT + plotH * (1 - f);
-      svg("line", { x1: padL, x2: w - padR, y1: y, y2: y, class: "mt-grid" }, el);
-      svg("text", { x: padL - 6, y: y + 4, "text-anchor": "end", class: "mt-axis" }, el).textContent = f === 0 ? "0" : fmt(max * f);
+      svg("line", { x1: padL, x2: w - padR, y1: y, y2: y, class: f === 0 ? "mt-grid is-base" : "mt-grid" }, el);
+      svg("text", { x: padL - 8, y: y + 3.5, "text-anchor": "end", class: "mt-axis" }, el).textContent = f === 0 ? "0" : fmt(max * f);
     }
-    const X = (i: number) => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+    const X = (i: number) => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW), Y = (v: number) => padT + plotH - (v / max) * plotH;
     for (const s of o.series) {
       let d = "";
-      s.values.forEach((v, i) => { if (v !== null) d += `${d ? "L" : "M"}${X(i)},${padT + plotH - (v / max) * plotH} `; });
+      s.values.forEach((v, i) => { if (v !== null) d += `${d ? "L" : "M"}${X(i)},${Y(v)} `; });
       if (d) svg("path", { d, class: s.cls }, el);
-      if (n <= 45) s.values.forEach((v, i) => { if (v !== null) { const c = svg("circle", { cx: X(i), cy: padT + plotH - (v / max) * plotH, r: 2.5, class: `mt-dot ${s.cls}` }, el); svg("title", {}, c).textContent = `${s.name} · ${o.xLabel(i)}: ${fmt(v)}`; } });
     }
-    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / 64))));
-    for (let i = 0; i < n; i += every) svg("text", { x: X(i), y: H - 5, "text-anchor": "middle", class: "mt-axis" }, el).textContent = o.xLabel(i);
+    // one invisible column per point: hovering anywhere near it shows every series' value for that position
+    const colW = n === 1 ? plotW : plotW / (n - 1);
+    for (let i = 0; i < n; i++) {
+      const g = svg("g", { class: "mt-col" }, el);
+      svg("rect", { x: X(i) - colW / 2, y: padT, width: colW, height: plotH, class: "mt-hit" }, g);
+      attachTip(g, () => ({ title: o.xLabel(i), rows: o.series.filter((s) => s.values[i] !== null && s.values[i] !== undefined).map((s) => ({ label: s.name, value: fmt(s.values[i] as number), muted: s.cls === "mt-line-prev" })) }));
+    }
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / 72))));
+    for (let i = 0; i < n; i += every) svg("text", { x: X(i), y: H - 6, "text-anchor": "middle", class: "mt-axis" }, el).textContent = o.xLabel(i);
     return el;
   });
 }
