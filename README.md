@@ -1,17 +1,42 @@
-# My Tracker — user guide
+# My Tracker -user guide
 
 **You log what you did. My Tracker does the mathematics.**
 Totals, averages, comparisons, trends, targets and charts are calculated for you from the raw entries. You never add up hours by hand.
 
 Everything stays in your vault. There is no account, no cloud service, no telemetry and no AI. (The only possible network call is to *your own* ActivityWatch app on this computer, and only if you switch that feature on.)
 
+
+## What's new in 0.1.2
+
+My Tracker 0.1.2 includes a redesigned dashboard experience, with Simple and Advanced views for different levels of detail. You can customize dashboard sections and charts to focus on the information that matters to you.
+
+For the complete changes, see the [changelog](CHANGELOG.md) and [GitHub releases](https://github.com/samantaansu2010/my-tracker/releases).
 ---
 
 ## 1. Install
 
-1. Download the plugin files `main.js`, `manifest.json`, `styles.css`.
-2. Put them in `<your vault>/.obsidian/plugins/my-tracker/`.
-3. In Obsidian: **Settings → Community plugins → turn on My Tracker**.
+
+**Requirements:** Obsidian 1.7.2 or later.
+
+### Install through Obsidian
+
+If My Tracker is listed in the Community Plugins browser:
+
+1. Open **Settings → Community plugins → Browse**.
+2. Search for **My Tracker**.
+3. Select it and click **Install**, then **Enable**.
+
+Obsidian can install compatible updates automatically when they are published through the Community Plugins directory.
+
+### Manual installation from GitHub
+
+1. Open the [My Tracker releases page](https://github.com/samantaansu2010/my-tracker/releases).
+2. Open the release you want and download `main.js`, `manifest.json`, and `styles.css` from its assets.
+3. Create `.obsidian/plugins/my-tracker/` inside your vault if it doesn't already exist.
+4. Copy all three files directly into that folder.
+5. In Obsidian, open **Settings → Community plugins** and enable **My Tracker**. Restart Obsidian if necessary.
+
+**Updating a manual installation:** Download the files from a newer release and replace the existing copies. Back up your vault before updating.
 
 ## 2. First run
 
