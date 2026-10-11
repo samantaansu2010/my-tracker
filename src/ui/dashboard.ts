@@ -13,8 +13,11 @@ import { recallStats, spacedRepetition, isRecall } from "../core/recall";
 import { describeIndexFormula, measurementStats, performanceIndex, resultStats } from "../core/performance";
 import { colorFor } from "../core/colors";
 import { ADVANCED_ORDER, SIMPLE_ORDER, hiddenByUser, isVisible, type ViewMode } from "../core/widgets";
-import { barChart, hBars, legend, lineChart, progressBar, ring, type BarItem } from "./charts";
+import { barChart, hBars, legend, lineChart, progressBar, ring, sparkline, type BarItem } from "./charts";
+import { hideTip } from "./tooltip";
 import { LayoutModal } from "./layoutEditor";
+import { AnalysisSections } from "./analysisView";
+import { autoGranularity, type AnalysisModel } from "../core/analysis";
 
 export const VIEW_TYPE = "my-tracker-dashboard";
 const RANGE_CHOICES: RangeId[] = ["today", "yesterday", "last7", "last14", "last30", "last90", "thisWeek", "prevWeek", "thisMonth", "prevMonth", "thisYear", "prevYear", "sinceJan1", "sinceInstall", "custom"];
@@ -36,9 +39,20 @@ export class DashboardView extends ItemView {
   private lastToday = "";
   private timer: number | null = null;
 
+  private sections: AnalysisSections;
+  /** chosen period of the activity chart (null = pick one from the range length) and whether to overlay the previous period */
+  private actGran: Granularity | null = null;
+  private actCompare = true;
+  private anModel: AnalysisModel | null = null;
+
   constructor(leaf: WorkspaceLeaf, private host: TrackerHost) {
     super(leaf);
     this.spec = { id: host.settings.dashboard.defaultRange };
+    this.sections = new AnalysisSections(host, {
+      widget: (board, id, title, o) => this.w(board, id, title, o),
+      setScope: (path) => { this.scopeIds = path; this.render(); },
+      rerender: () => this.render(),
+    });
   }
   getViewType(): string { return VIEW_TYPE; }
   getDisplayText(): string { return "My Tracker"; }
@@ -86,9 +100,20 @@ export class DashboardView extends ItemView {
     const c = parent.createDiv({ cls: "mt-stat" });
     if (title) c.setAttribute("title", title);
     c.createDiv({ cls: "mt-stat-label", text: label });
-    c.createDiv({ cls: "mt-stat-value", text: value });
+    c.createDiv({ cls: "mt-stat-value" + (value.length > 10 ? " is-text" : ""), text: value });
     if (sub) c.createDiv({ cls: "mt-stat-sub", text: sub });
     return c;
+  }
+  /** Fewer than two active periods is not a trend: say so in one line instead of drawing a nearly empty chart. */
+  private sparseNote(body: HTMLElement, buckets: Bucket[], unit: string, label: (b: Bucket) => string, drill: (b: Bucket) => void): boolean {
+    const active = buckets.filter((b) => b.minutes > 0);
+    if (active.length > 1) return false;
+    const line = body.createDiv({ cls: "mt-empty mt-sparse" });
+    if (!active.length) { line.setText("No activity in this range."); return true; }
+    const b = active[0];
+    line.createSpan({ text: `Only one ${unit} has activity so far: ${formatDuration(b.minutes)} (${label(b)}). A trend appears once there are a few more. ` });
+    line.createEl("button", { cls: "mt-linkbtn", text: "events" }).addEventListener("click", () => drill(b));
+    return true;
   }
   private chip(parent: HTMLElement, text: string, color?: string): HTMLElement {
     const c = parent.createSpan({ cls: "mt-chip", text });
@@ -116,7 +141,9 @@ export class DashboardView extends ItemView {
     this.contentEl.empty();
     this.contentEl.toggleClass("is-simple", this.simple);
     this.contentEl.toggleClass("is-advanced", !this.simple);
+    hideTip();
     const c = this.build();
+    this.anModel = null;
     this.lastToday = c.today;
     this.header(c);
     if (!this.host.store.size) this.onboard();
@@ -135,7 +162,15 @@ export class DashboardView extends ItemView {
       chartPlanned: () => this.wPlanned(board, c), longestSessions: () => this.wLongestSessions(board, c), longestGaps: () => this.wLongestGaps(board, c),
       peaks: () => this.wPeaks(board, c), results: () => this.wResults(board, c), recall: () => this.wRecall(board, c),
     };
+    if (id === "overview") { this.wOverview(board, c); return; }
+    if ((AnalysisSections.IDS as readonly string[]).includes(id)) { this.wAnalysis(id, board, c); return; }
     map[id]?.();
+  }
+
+  /** Heatmap, session length, insights and the optional subject/time-distribution widgets share one analysis model per render. */
+  private wAnalysis(id: string, board: HTMLElement, c: Ctx): void {
+    this.anModel ??= this.sections.build({ all: c.all, today: c.today, range: c.range, prev: c.prev, scope: this.sc });
+    this.sections.render(id, board, this.anModel, this.sc);
   }
 
   private header(c: Ctx): void {
@@ -151,6 +186,7 @@ export class DashboardView extends ItemView {
     const custom = row.createEl("button", { cls: "mt-ghost", attr: { "aria-label": "Customize dashboard" } });
     this.renderIcon(custom, "sliders-horizontal"); custom.createSpan({ text: "Customize" });
     custom.addEventListener("click", () => new LayoutModal(this.host, this.mode).open());
+
     const add = row.createEl("button", { cls: "mod-cta mt-add", attr: { "aria-label": "Track activity" } });
     this.renderIcon(add, "plus"); add.createSpan({ text: "Track" });
     add.addEventListener("click", () => this.host.openTrack());
@@ -265,7 +301,7 @@ export class DashboardView extends ItemView {
 
   private wGoals(board: HTMLElement, c: Ctx): void {
     const s = this.host.settings;
-    const body = this.w(board, "goals", "Goals");
+    const body = this.w(board, "goals", "Goals", { wide: this.simple });
     if (!s.targets.length) { body.createDiv({ cls: "mt-empty", text: "No goals yet — add one in Settings → Targets." }); return; }
     const grid = body.createDiv({ cls: this.simple ? "mt-goals" : "mt-targets" });
     for (const t of s.targets) {
@@ -333,6 +369,50 @@ export class DashboardView extends ItemView {
     } else makeRow(parent, true);
   }
 
+  /** "▲ 35% vs last 30 days" style chip. Only a real percentage is shown: nothing before reads "new", never an invented figure. */
+  private deltaChip(parent: HTMLElement, d: Delta, prevLabel: string, o: { short?: boolean } = {}): void {
+    const vs = o.short ? "" : ` vs ${prevLabel.toLowerCase()}`;
+    if (d.kind === "pct" && d.diff !== null && d.pct !== null) {
+      if (d.diff === 0) { parent.createSpan({ cls: "mt-delta is-flat", text: `no change${vs}` }); return; }
+      const up = d.diff > 0, p = Math.abs(d.pct);
+      parent.createSpan({ cls: `mt-delta ${up ? "is-up" : "is-down"}`, text: `${up ? "▲" : "▼"} ${p >= 10 ? p.toFixed(0) : p.toFixed(1)}%${vs}` });
+    } else if (d.kind === "new") parent.createSpan({ cls: "mt-delta is-new", text: o.short ? "new" : `new · nothing in ${prevLabel.toLowerCase()}` });
+  }
+
+  /** The first thing Advanced shows: the period's total with its change, a trend line, and four supporting numbers. */
+  private wOverview(board: HTMLElement, c: Ctx): void {
+    const body = this.w(board, "overview", c.range.label, { sub: `${this.fmtDate(c.range.start)} → ${this.fmtDate(c.stats.end)}` });
+    body.addClass("mt-overview");
+    if (!c.stats.calendarDays) { body.createDiv({ cls: "mt-empty", text: "This period hasn't started yet." }); return; }
+    if (c.stats.totalMinutes <= 0) {
+      body.createDiv({ cls: "mt-empty", text: c.prevStats.totalMinutes > 0 ? `Nothing tracked in this period yet. ${c.prev.label}: ${formatDuration(c.prevStats.totalMinutes)}.` : "Nothing tracked in this period yet." });
+      return;
+    }
+    const cmp = compareStats(c.stats, c.prevStats), st = c.stats;
+    const hero = body.createDiv({ cls: "mt-ov-hero" });
+    const main = hero.createDiv({ cls: "mt-ov-main" });
+    main.createDiv({ cls: "mt-ov-label", text: "Total time" });
+    main.createDiv({ cls: "mt-ov-value", text: formatDuration(st.totalMinutes) });
+    const chips = main.createDiv({ cls: "mt-ov-chips" });
+    this.deltaChip(chips, cmp.minutes, c.prev.label);
+    const gran = autoGranularity(st.calendarDays);
+    const series = bucketSeries(c.events, c.range.start, st.end, gran, this.host.settings.weekStartsOn).map((b) => b.minutes);
+    sparkline(hero.createDiv({ cls: "mt-ov-spark" }), series, { aria: `Trend of time per ${gran} in ${c.range.label}` });
+    const tiles = body.createDiv({ cls: "mt-ov-tiles" });
+    const tile = (label: string, value: string, d?: Delta, sub?: string) => {
+      const t = tiles.createDiv({ cls: "mt-ov-tile" });
+      t.createDiv({ cls: "mt-ov-label", text: label });
+      t.createDiv({ cls: "mt-ov-tile-value", text: value });
+      const row = t.createDiv({ cls: "mt-ov-chips" });
+      if (d) this.deltaChip(row, d, c.prev.label, { short: true });
+      if (sub) row.createSpan({ cls: "mt-ov-sub", text: sub });
+    };
+    tile("Sessions", String(st.sessions), cmp.sessions);
+    tile("Active days", `${st.activeDays} of ${st.calendarDays}`, cmp.activeDays, st.consistency === null ? undefined : formatPercent(st.consistency));
+    tile("Per active day", st.activeDays ? formatDuration(st.avgPerActiveDay) : "–", cmp.avgPerActiveDay);
+    tile("Current streak", c.streak ? plural(c.streak, "day") : "–", undefined, st.longestStreak > c.streak ? `best ${st.longestStreak}` : undefined);
+  }
+
   private wComparison(board: HTMLElement, c: Ctx): void {
     const cmp = compareStats(c.stats, c.prevStats);
     if (this.simple) {
@@ -350,13 +430,15 @@ export class DashboardView extends ItemView {
       return;
     }
     const body = this.w(board, "comparison", `${c.range.label} vs ${c.prev.label}`, { sub: `${this.fmtDate(c.range.start)} → ${this.fmtDate(c.stats.end)} vs ${this.fmtDate(c.prev.start)} → ${this.fmtDate(c.prev.end)}` });
+    if (c.prevStats.totalMinutes <= 0 && c.stats.totalMinutes <= 0) { body.createDiv({ cls: "mt-empty", text: "Nothing was recorded in this period or the one before it." }); return; }
+    if (c.prevStats.totalMinutes <= 0) { body.createDiv({ cls: "mt-empty", text: `Nothing was recorded in the previous period, so there is nothing to compare with yet. This period: ${formatDuration(c.stats.totalMinutes)} in ${plural(c.stats.sessions, "session")}.` }); return; }
     const tbl = body.createEl("table", { cls: "mt-table" });
     const head = tbl.createEl("thead").createEl("tr"); ["", "Now", "Before", "Difference", "Change"].forEach((x) => head.createEl("th", { text: x }));
     const row = (label: string, d: Delta, f: (n: number) => string, signed: (n: number) => string) => {
       const tr = tbl.createEl("tr"); tr.createEl("td", { text: label });
       tr.createEl("td", { text: d.current === null ? "–" : f(d.current) }); tr.createEl("td", { text: d.previous === null ? "–" : f(d.previous) });
       tr.createEl("td", { text: d.diff === null ? "–" : signed(d.diff) });
-      const dt = this.deltaText(d); tr.createEl("td", { text: d.kind === "new" ? "new (nothing before)" : dt.text, cls: dt.cls });
+      const dt = this.deltaText(d); tr.createEl("td", { text: dt.text, cls: dt.cls });
     };
     const sgn = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n)}`;
     row("Time", cmp.minutes, formatDuration, formatSignedDuration);
@@ -369,7 +451,7 @@ export class DashboardView extends ItemView {
     const s = this.host.settings;
     const items = evaluateNeglect(s.tree, c.all, c.today, s.neglect.defaultThresholdDays).filter((i) => !this.sc.length || this.sc.every((x, k) => i.path[k] === x));
     const bad = items.filter((i) => i.status === "neglected");
-    const body = this.w(board, "attention", "Needs attention");
+    const body = this.w(board, "attention", "Needs attention", { wide: this.simple });
     if (!bad.length) { const l = body.createDiv({ cls: "mt-ok" }); this.renderIcon(l, "check"); l.createSpan({ text: this.simple ? "You’re all caught up" : "Nothing is overdue" }); }
     for (const i of bad) {
       const row = body.createDiv({ cls: "mt-neglect" });
@@ -420,24 +502,59 @@ export class DashboardView extends ItemView {
     return { items, legend: [...totals].sort((a, b) => b[1] - a[1]).map(([name]) => ({ name, color: this.color([...this.sc, name]) })) };
   }
   private bucketItem(b: Bucket, gran: Granularity): BarItem {
-    return { label: gran === "month" ? formatMonthLabel(b.key, this.host.settings.dateFormat) : formatShortDate(b.start, this.host.settings.dateFormat), value: b.minutes, key: b.key, title: `${gran === "day" ? this.fmtDate(b.start) : gran === "week" ? "Week of " + this.fmtDate(b.start) : b.key}: ${formatDuration(b.minutes)}, ${plural(b.sessions, "session")}` };
+    const s = this.host.settings, month = formatMonthLabel(b.key, s.dateFormat);
+    const weekday = new Date(`${b.start}T12:00:00`).toLocaleDateString(undefined, { weekday: "short" });
+    return {
+      label: gran === "month" ? month : formatShortDate(b.start, s.dateFormat), value: b.minutes, key: b.key,
+      title: `${gran === "day" ? this.fmtDate(b.start) : gran === "week" ? "Week of " + this.fmtDate(b.start) : b.key}: ${formatDuration(b.minutes)}, ${plural(b.sessions, "session")}`,
+      heading: gran === "day" ? `${weekday}, ${this.fmtDate(b.start)}` : gran === "week" ? `Week of ${this.fmtDate(b.start)}` : month,
+      sub: plural(b.sessions, "session"),
+    };
   }
 
   private wChartActivity(board: HTMLElement, c: Ctx): void {
     const s = this.host.settings, days = c.stats.calendarDays;
     if (!days) return;
-    const gran: Granularity = days <= 62 ? "day" : days <= 400 ? "week" : "month", el = { start: c.range.start, end: c.stats.end };
-    const body = this.w(board, "chartActivity", `Activity over time`, { sub: gran === "day" ? `${s.charts.movingAverageWindow}-day average line` : gran === "week" ? "weekly" : "monthly" });
+    const gran: Granularity = this.actGran ?? autoGranularity(days), el = { start: c.range.start, end: c.stats.end };
+    const win = s.charts.movingAverageWindow;
+    const body = this.w(board, "chartActivity", "Activity over time", { sub: gran === "day" ? `${win}-day average line` : gran === "week" ? "weekly totals" : "monthly totals" });
     const buckets = bucketSeries(c.events, el.start, el.end, gran, s.weekStartsOn);
+    const prevBuckets = c.prevStats.calendarDays ? bucketSeries(c.events, c.prev.start, c.prevStats.end, gran, s.weekStartsOn) : [];
+    // the previous period is overlaid position by position, which only means something when both have the same number of buckets (always true for days)
+    const canCompare = prevBuckets.some((b) => b.minutes > 0) && (gran === "day" || prevBuckets.length === buckets.length);
+    const showPrev = canCompare && this.actCompare;
+
+    const bar = body.createDiv({ cls: "mt-toolbar" });
+    const seg = bar.createDiv({ cls: "mt-seg mt-seg-small", attr: { role: "group", "aria-label": "Chart period" } });
+    for (const g of ["day", "week", "month"] as Granularity[]) {
+      const btn = seg.createEl("button", { cls: "mt-seg-btn" + (g === gran ? " is-active" : ""), text: g[0].toUpperCase() + g.slice(1), attr: { "aria-pressed": String(g === gran) } });
+      btn.addEventListener("click", () => { this.actGran = g; this.render(); });
+    }
+    if (canCompare) {
+      const t = bar.createEl("button", { cls: "mt-toggle" + (showPrev ? " is-on" : ""), text: `vs ${c.prev.label.toLowerCase()}`, attr: { "aria-pressed": String(showPrev), title: "Overlay the previous period" } });
+      t.addEventListener("click", () => { this.actCompare = !this.actCompare; this.render(); });
+    }
+
+    const clip = (b: Bucket) => ({ from: b.start < el.start ? el.start : b.start, to: b.end > el.end ? el.end : b.end });
+    if (this.sparseNote(body, buckets, gran, (b) => (gran === "month" ? formatMonthLabel(b.key, s.dateFormat) : this.fmtDate(b.start)), (b) => { const r = clip(b); this.drillPath(this.sc, r.from, r.to); })) return;
     const st = this.stacked(c, buckets, gran, (b) => this.bucketItem(b, gran));
-    legend(body, st.legend);
-    barChart(body, { items: st.items, line: gran === "day" ? movingAverage(buckets.map((b) => b.minutes), s.charts.movingAverageWindow) : undefined, lineLabel: `${s.charts.movingAverageWindow}-day moving average`, aria: "Activity over time", onSelect: (it) => { const b = buckets.find((x) => x.key === it.key)!; const s0 = b.start < el.start ? el.start : b.start, e0 = b.end > el.end ? el.end : b.end; this.drillPath(this.sc, s0, e0, `${this.sc.length ? pathLabel(this.sc) : "All activity"} · ${this.fmtDate(s0)}${s0 === e0 ? "" : " → " + this.fmtDate(e0)}`); } });
+    if (showPrev) st.items.forEach((it, i) => { it.ghost = prevBuckets[i]?.minutes ?? null; });
+    const key = body.createDiv({ cls: "mt-legend" });
+    if (st.legend.length > 1) for (const e of st.legend.slice(0, 8)) { const li = key.createSpan({ cls: "mt-legend-item" }); li.createSpan({ cls: "mt-dot-c" }).style.background = e.color; li.createSpan({ text: e.name }); }
+    if (gran === "day") { const li = key.createSpan({ cls: "mt-legend-item" }); li.createSpan({ cls: "mt-swatch mt-line" }); li.createSpan({ text: `${win}-day average` }); }
+    if (showPrev) { const li = key.createSpan({ cls: "mt-legend-item" }); li.createSpan({ cls: "mt-swatch-tick" }); li.createSpan({ text: "previous period" }); }
+    barChart(body, {
+      items: st.items, line: gran === "day" ? movingAverage(buckets.map((b) => b.minutes), win) : undefined, lineLabel: `${win}-day average`, ghostLabel: c.prev.label,
+      aria: "Activity over time", height: 210,
+      onSelect: (it) => { const b = buckets.find((x) => x.key === it.key)!; const r = clip(b); this.drillPath(this.sc, r.from, r.to, `${this.sc.length ? pathLabel(this.sc) : "All activity"} · ${this.fmtDate(r.from)}${r.from === r.to ? "" : " → " + this.fmtDate(r.to)}`); },
+    });
   }
   private wChartBuckets(board: HTMLElement, c: Ctx, kind: "weekly" | "monthly"): void {
     const s = this.host.settings, week = kind === "weekly", gran: Granularity = week ? "week" : "month";
     const start = week ? addDays(startOfWeek(c.today, s.weekStartsOn), -77) : shiftMonthStart(c.today, -11);
     const buckets = bucketSeries(c.events, start, c.today, gran, s.weekStartsOn);
     const body = this.w(board, week ? "chartWeekly" : "chartMonthly", week ? "Weekly activity" : "Monthly activity", { wide: false, sub: week ? "last 12 weeks" : "last 12 months" });
+    if (this.sparseNote(body, buckets, week ? "week" : "month", (b) => (week ? `week of ${this.fmtDate(b.start)}` : formatMonthLabel(b.key, s.dateFormat)), (b) => this.drillPath(this.sc, b.start, b.end, week ? `Week of ${this.fmtDate(b.start)}` : formatMonthLabel(b.key, s.dateFormat)))) return;
     const st = this.stacked(c, buckets, gran, (b) => this.bucketItem(b, gran));
     legend(body, st.legend);
     barChart(body, { items: st.items, aria: week ? "Weekly activity" : "Monthly activity", onSelect: (it) => { const b = buckets.find((x) => x.key === it.key)!; this.drillPath(this.sc, b.start, b.end, week ? `Week of ${this.fmtDate(b.start)}` : it.label); } });
@@ -507,9 +624,21 @@ export class DashboardView extends ItemView {
     if (!rs.rated && !ms.length) return;
     const body = this.w(board, "results", "Results & grades", { sub: "your own marks — not a measure of ability" });
     if (rs.rated) { const g = body.createDiv({ cls: "mt-chips" }); for (const x of rs.counts.filter((q) => q.count)) this.chip(g, `${x.label} × ${x.count}`); }
-    for (const m of ms) body.createDiv({ text: `${m.def.name}: average ${m.mean!.toFixed(1)}${m.def.unit === "%" ? "%" : ""} (${m.min}–${m.max}, ${plural(m.n, "session")})` });
+    if (ms.length) {
+      const tbl = body.createEl("table", { cls: "mt-table mt-results-table" });
+      const head = tbl.createEl("thead").createEl("tr"); ["Measure", "Average", "Range", "Sessions"].forEach((x) => head.createEl("th", { text: x }));
+      for (const m of ms) {
+        const tr = tbl.createEl("tr"), unit = m.def.unit === "%" ? "%" : "";
+        tr.createEl("td", { text: m.def.name }); tr.createEl("td", { text: `${m.mean!.toFixed(1)}${unit}` }); tr.createEl("td", { text: `${m.min}–${m.max}${unit}` }); tr.createEl("td", { text: String(m.n) });
+      }
+    }
     const idx = performanceIndex(c.rangeEvents, s.resultScale, s.measurements, s.performance);
-    if (idx.index !== null) { body.createDiv({ cls: "mt-strong", text: `Performance index: ${idx.index.toFixed(1)} / 100` }).setAttribute("title", describeIndexFormula(s.performance, s.measurements)); body.createDiv({ cls: "mt-muted", text: describeIndexFormula(s.performance, s.measurements) }); }
+    if (idx.index !== null) {
+      body.createDiv({ cls: "mt-strong mt-index", text: `Performance index: ${idx.index.toFixed(1)} / 100` });
+      const how = body.createEl("details", { cls: "mt-details" });
+      how.createEl("summary", { text: "How is this calculated?" });
+      how.createDiv({ cls: "mt-muted", text: describeIndexFormula(s.performance, s.measurements) });
+    }
   }
 
   private wRecall(board: HTMLElement, c: Ctx): void {
