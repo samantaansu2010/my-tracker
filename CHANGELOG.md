@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 — 2026-10-11
 
 - **Advanced is the one place for analytics.** The separate Analysis page and its button are gone. The `Open analysis` command opens the Advanced dashboard, and an Analysis tab restored from an earlier session redirects there.
 - **New Overview section** at the top of Advanced: total time with its change against the previous period, a trend line, and sessions / active days / per-active-day / streak with their own changes. Changes appear only when there is a previous period to compare with; "new" is shown instead of an invented percentage.
