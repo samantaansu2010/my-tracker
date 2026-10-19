@@ -559,3 +559,26 @@ rect.mt-heat-c:hover, rect.mt-heat-c:focus-visible { stroke: var(--text-muted); 
 .mt-cal-cell.is-selected { border-radius: 8px; box-shadow: inset 0 0 0 1px var(--interactive-accent), 0 2px 12px color-mix(in srgb, var(--interactive-accent) 8%, transparent); }
 .mt-cal-month-event { border-radius: 7px; min-height: 25px; }
 .mt-cal-time-event { border-radius: 9px; }
+
+
+/* Calendar palette fix: event selectors need to be at least as specific as the shared event rule. */
+.mt-cal-time-event.mt-cal-color-0, .mt-cal-month-event.mt-cal-color-0 { --mt-cal-event-color: #8b7cf6; }
+.mt-cal-time-event.mt-cal-color-1, .mt-cal-month-event.mt-cal-color-1 { --mt-cal-event-color: #42b883; }
+.mt-cal-time-event.mt-cal-color-2, .mt-cal-month-event.mt-cal-color-2 { --mt-cal-event-color: #e6a23c; }
+.mt-cal-time-event.mt-cal-color-3, .mt-cal-month-event.mt-cal-color-3 { --mt-cal-event-color: #e879a9; }
+.mt-cal-time-event.mt-cal-color-4, .mt-cal-month-event.mt-cal-color-4 { --mt-cal-event-color: #38a6c8; }
+.mt-cal-time-event.mt-cal-color-5, .mt-cal-month-event.mt-cal-color-5 { --mt-cal-event-color: #d97757; }
+.mt-cal-time-event.mt-cal-color-6, .mt-cal-month-event.mt-cal-color-6 { --mt-cal-event-color: #78a85a; }
+.mt-cal-time-event.mt-cal-color-7, .mt-cal-month-event.mt-cal-color-7 { --mt-cal-event-color: #a78bfa; }
+
+/* Reference-inspired finish: crisp hour rules, gentle day separation, color-led events. */
+.mt-cal-time-grid { background: var(--background-primary); }
+.mt-cal-time-gutter { background: var(--background-secondary); }
+.mt-cal-hour-label { border-bottom-color: color-mix(in srgb, var(--background-modifier-border) 78%, transparent); }
+.mt-cal-time-column { background-image: linear-gradient(to bottom, transparent calc(var(--mt-cal-hour-height, 48px) - 1px), color-mix(in srgb, var(--background-modifier-border) 84%, transparent) calc(var(--mt-cal-hour-height, 48px) - 1px)); background-size: 100% var(--mt-cal-hour-height, 48px); }
+.mt-cal-time-event { min-width: 0; }
+.mt-cal-time-event-title { overflow: hidden; text-overflow: ellipsis; }
+.mt-cal-time-event.is-scheduled { border-style: dashed; }
+.mt-cal-month-event.is-scheduled { border-style: dashed; }
+.mt-cal-time-event:active, .mt-cal-month-event:active { transform: scale(.995); }
+.mt-cal-time-event:focus-visible, .mt-cal-month-event:focus-visible { z-index: 6; outline: 2px solid var(--mt-cal-event-color); outline-offset: 1px; }
