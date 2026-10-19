@@ -155,9 +155,17 @@ export class EventStore {
   }
 
   // ---------- queries ----------
+  /** Completed work only; existing analytics should never count future plans as actual time. */
   list(): TrackerEvent[] {
+    return this.listAll().filter((event) => event.status !== "scheduled");
+  }
+  /** All records, including scheduled tasks. Use for backups, exports, and calendar rendering. */
+  listAll(): TrackerEvent[] {
     if (!this.cache) this.cache = [...this.byId.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp) || a.id.localeCompare(b.id));
     return this.cache;
+  }
+  listScheduled(): TrackerEvent[] {
+    return this.listAll().filter((event) => event.status === "scheduled");
   }
   get(id: string): TrackerEvent | undefined { return this.byId.get(id); }
   get size(): number { return this.byId.size; }
