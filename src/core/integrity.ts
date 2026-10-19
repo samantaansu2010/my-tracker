@@ -7,12 +7,12 @@ import { newId } from "./ids";
 export type Validation = { ok: true; event: TrackerEvent } | { ok: false; errors: string[] };
 
 const TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/;
-const KNOWN = new Set(["id", "timestamp", "date", "path", "durationMinutes", "kind", "result", "scores", "plannedMinutes", "tags", "notes", "source", "externalId", "createdAt", "updatedAt", "extra"]);
+const KNOWN = new Set(["id", "timestamp", "date", "path", "durationMinutes", "kind", "result", "scores", "plannedMinutes", "status", "tags", "notes", "source", "externalId", "createdAt", "updatedAt", "extra"]);
 export const MAX_PATH_DEPTH = 12;
 export const MAX_DURATION_MINUTES = 24 * 60;
 
 export function eventFingerprint(e: Pick<TrackerEvent, "timestamp" | "path" | "durationMinutes" | "kind" | "result" | "notes" | "source">): string {
-  return [e.timestamp, e.path.join(SEP), e.durationMinutes, e.kind ?? "", e.result ?? "", e.notes, e.source].join("|");
+  return [e.timestamp, e.path.join(SEP), e.durationMinutes, e.kind ?? "", e.result ?? "", e.notes, e.source, (e as TrackerEvent).status ?? "completed"].join("|");
 }
 
 /** Accepts legacy/loose shapes (category/subject/subsubject/topic fields instead of path) and fills defaults. */
@@ -53,6 +53,9 @@ export function validateEvent(raw: unknown): Validation {
   const dur = r.durationMinutes;
   if (typeof dur !== "number" || !Number.isFinite(dur) || dur <= 0 || dur > MAX_DURATION_MINUTES) errors.push("invalid durationMinutes (must be > 0 and <= 1440)");
 
+  if (r.status !== undefined && r.status !== "scheduled" && r.status !== "completed") errors.push("invalid status");
+  const status = r.status === "scheduled" ? "scheduled" : undefined;
+
   let planned: number | undefined;
   if (r.plannedMinutes !== undefined && r.plannedMinutes !== null) {
     if (typeof r.plannedMinutes !== "number" || !Number.isFinite(r.plannedMinutes) || r.plannedMinutes < 0) errors.push("invalid plannedMinutes");
@@ -83,6 +86,7 @@ export function validateEvent(raw: unknown): Validation {
   if (typeof r.result === "string" && r.result.trim()) event.result = r.result.trim();
   if (scores && Object.keys(scores).length) event.scores = scores;
   if (planned !== undefined) event.plannedMinutes = planned;
+  if (status) event.status = status;
   if (typeof r.externalId === "string" && r.externalId) event.externalId = r.externalId;
   if (Object.keys(extra).length) event.extra = extra;
   return { ok: true, event };
