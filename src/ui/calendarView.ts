@@ -15,6 +15,14 @@ type Mode = "day" | "week" | "month" | "list";
 type Filter = "all" | "scheduled" | "completed";
 const MODES: Mode[] = ["day", "week", "month", "list"];
 
+// Stable subject colors keep the same category visually consistent in every view.
+function colorClass(event: TrackerEvent): string {
+  const key = event.path[0] ?? event.path[event.path.length - 1] ?? "other";
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  return "mt-cal-color-" + (Math.abs(hash) % 8);
+}
+
 export class CalendarView extends ItemView {
   private date: string;
   private mode: Mode = "day";
@@ -156,7 +164,7 @@ export class CalendarView extends ItemView {
       const laneCount = Math.max(1, laneEnds.length);
       for (const segment of positioned) {
         const button = col.createEl("button", {
-          cls: "mt-cal-time-event" + (isScheduled(segment.event) ? " is-scheduled" : ""),
+          cls: "mt-cal-time-event " + colorClass(segment.event) + (isScheduled(segment.event) ? " is-scheduled" : ""),
           attr: { type: "button", "aria-label": `Edit ${segment.event.path.join(" ")} at ${segment.event.timestamp.slice(11, 16)}, ${segment.event.durationMinutes} minutes` },
         });
         const top = segment.start / 60 * 48;
@@ -211,7 +219,7 @@ export class CalendarView extends ItemView {
         if (planned) summary.createSpan({ text: "◷ " + formatMinutes(planned), cls: "mt-cal-day-planned" });
         const chips = cell.createDiv({ cls: "mt-cal-month-events" });
         for (const e of rows.slice(0, 3)) {
-          const chip = chips.createEl("button", { cls: "mt-cal-month-event" + (isScheduled(e) ? " is-scheduled" : ""), attr: { type: "button", title: e.path.join(" › ") + " · " + formatMinutes(e.durationMinutes) } });
+          const chip = chips.createEl("button", { cls: "mt-cal-month-event " + colorClass(e) + (isScheduled(e) ? " is-scheduled" : ""), attr: { type: "button", title: e.path.join(" › ") + " · " + formatMinutes(e.durationMinutes) } });
           chip.createSpan({ cls: "mt-cal-month-time", text: e.timestamp.slice(11, 16) });
           chip.createSpan({ cls: "mt-cal-month-name", text: e.path[e.path.length - 1] ?? e.path.join(" › ") });
           chip.addEventListener("click", (event) => { event.stopPropagation(); this.host.openTrack(e); });
