@@ -95,13 +95,42 @@ export class CalendarView extends ItemView {
       this.renderMonth(root, all);
     } else if (this.mode === "week") {
       const start = addDays(this.date, -((new Date(this.date + "T12:00:00").getDay() - this.host.settings.weekStartsOn + 7) % 7));
-      const grid = root.createDiv({ cls: "mt-cal-week" });
-      for (let i = 0; i < 7; i++) this.renderDayCell(grid, addDays(start, i), all);
+      this.renderTimeGrid(root, Array.from({ length: 7 }, (_, i) => addDays(start, i)), all);
     } else {
-      const day = root.createDiv({ cls: "mt-cal-day" });
-      day.createEl("h3", { text: this.date === this.host.today() ? "Today" : formatDateKey(this.date, this.host.settings.dateFormat) });
-      if (!entries.length) day.createDiv({ cls: "mt-cal-empty", text: "No entries for this day." });
-      for (const e of entries) this.renderEvent(day, e);
+      this.renderTimeGrid(root, [this.date], all);
+    }
+  }
+
+  private renderTimeGrid(parent: HTMLElement, dates: string[], events: TrackerEvent[]): void {
+    const grid = parent.createDiv({ cls: "mt-cal-time-grid" });
+    const gutter = grid.createDiv({ cls: "mt-cal-time-gutter" });
+    gutter.createDiv({ cls: "mt-cal-time-heading", text: "Time" });
+    for (let hour = 0; hour < 24; hour++) gutter.createDiv({ cls: "mt-cal-hour-label", text: `${String(hour).padStart(2, "0")}:00` });
+    for (const date of dates) {
+      const col = grid.createDiv({ cls: "mt-cal-time-column" });
+      const heading = col.createDiv({ cls: "mt-cal-time-heading" });
+      const dayButton = heading.createEl("button", { text: formatShortDate(date, this.host.settings.dateFormat), attr: { type: "button", "aria-label": "Open day " + date } });
+      if (date === this.host.today()) dayButton.addClass("is-today");
+      dayButton.addEventListener("click", () => { this.date = date; this.mode = "day"; this.render(); });
+      const rows = Array.from({ length: 24 }, (_, hour) => {
+        const slot = col.createDiv({ cls: "mt-cal-hour-slot" });
+        slot.addEventListener("click", (event) => {
+          if ((event.target as HTMLElement).closest("button")) return;
+          const rect = slot.getBoundingClientRect();
+          const minute = Math.max(0, Math.min(59, Math.floor(((event as MouseEvent).clientY - rect.top) / Math.max(1, rect.height) * 60)));
+          const start = `${String(hour).padStart(2, "0")}:${String(Math.floor(minute / 5) * 5).padStart(2, "0")}`;
+          this.host.openTrack(undefined, { date, start, durationMinutes: 60, status: date > this.host.today() ? "scheduled" : "completed" });
+        });
+        return slot;
+      });
+      for (const e of events.filter((item) => item.date === date)) {
+        const hour = Number(e.timestamp.slice(11, 13));
+        const slot = rows[Number.isFinite(hour) && hour >= 0 && hour < 24 ? hour : 0];
+        const button = slot.createEl("button", { cls: "mt-cal-time-event" + (isScheduled(e) ? " is-scheduled" : ""), attr: { type: "button", "aria-label": `Edit ${e.path.join(" ")} at ${e.timestamp.slice(11, 16)}` } });
+        button.createSpan({ cls: "mt-cal-time-event-time", text: e.timestamp.slice(11, 16) });
+        button.createSpan({ cls: "mt-cal-time-event-title", text: e.path.join(" › ") });
+        button.addEventListener("click", (event) => { event.stopPropagation(); this.host.openTrack(e); });
+      }
     }
   }
 
