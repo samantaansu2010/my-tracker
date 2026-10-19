@@ -187,6 +187,10 @@ export class DashboardView extends ItemView {
     this.renderIcon(custom, "sliders-horizontal"); custom.createSpan({ text: "Customize" });
     custom.addEventListener("click", () => new LayoutModal(this.host, this.mode).open());
 
+    const calendar = row.createEl("button", { cls: "mt-ghost", attr: { "aria-label": "Open calendar" } });
+    this.renderIcon(calendar, "calendar-days"); calendar.createSpan({ text: "Calendar" });
+    calendar.addEventListener("click", () => void this.host.openCalendar());
+
     const add = row.createEl("button", { cls: "mod-cta mt-add", attr: { "aria-label": "Track activity" } });
     this.renderIcon(add, "plus"); add.createSpan({ text: "Track" });
     add.addEventListener("click", () => this.host.openTrack());
