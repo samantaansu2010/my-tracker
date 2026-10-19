@@ -102,6 +102,20 @@ export class CalendarView extends ItemView {
     select.addEventListener("change", () => { this.filter = select.value as Filter; this.render(); });
 
     const all = this.host.store.listAll().filter((e) => this.filter === "all" || (this.filter === "scheduled" ? isScheduled(e) : !isScheduled(e)));
+    // A compact category legend makes the color system discoverable without taking over Obsidian's file sidebar.
+    const categories = new Map<string, TrackerEvent>();
+    for (const event of all) {
+      const category = event.path[0] ?? "Other";
+      if (!categories.has(category)) categories.set(category, event);
+    }
+    if (categories.size > 0) {
+      const legend = root.createDiv({ cls: "mt-cal-legend", attr: { "aria-label": "Calendar category colors" } });
+      for (const [category, event] of categories) {
+        const item = legend.createDiv({ cls: "mt-cal-legend-item" });
+        item.createSpan({ cls: "mt-cal-legend-dot " + colorClass(event) });
+        item.createSpan({ text: category, cls: "mt-cal-legend-label" });
+      }
+    }
     if (this.mode === "list") {
       this.renderList(root, all);
     } else if (this.mode === "month") {
