@@ -1,7 +1,7 @@
-import { ItemView, setIcon, type WorkspaceLeaf } from "obsidian";
+import { ItemView, type WorkspaceLeaf } from "obsidian";
 import type { TrackerHost } from "../host";
 import type { TrackerEvent } from "../core/types";
-import { addDays, formatDateKey, formatShortDate, isDateKey, toDateKey } from "../core/dates";
+import { addDays, formatDateKey, formatShortDate, isDateKey } from "../core/dates";
 import { isScheduled } from "../core/schedule";
 
 export const CALENDAR_VIEW_TYPE = "my-tracker-calendar";
