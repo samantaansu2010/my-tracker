@@ -638,3 +638,30 @@ rect.mt-heat-c:hover, rect.mt-heat-c:focus-visible { stroke: var(--text-muted); 
 .mt-calendar .mt-cal-month-event.is-scheduled {
   background-image: repeating-linear-gradient(135deg, transparent, transparent 7px, color-mix(in srgb, var(--mt-cal-event-color) 12%, transparent) 7px, color-mix(in srgb, var(--mt-cal-event-color) 12%, transparent) 14px);
 }
+
+
+/* Reference-inspired workspace: category rail beside the calendar, not above it. */
+.mt-cal-workspace { display: grid; grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); align-items: start; gap: 16px; min-width: 0; }
+.mt-cal-sidebar { position: sticky; top: 118px; display: flex; flex-direction: column; gap: 5px; padding: 12px 10px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-secondary); min-width: 0; }
+.mt-cal-sidebar-heading { padding: 2px 8px 8px; color: var(--text-faint); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
+.mt-cal-category-toggle { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 8px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-muted); text-align: left; cursor: pointer; transition: background .16s ease, border-color .16s ease, color .16s ease; }
+.mt-cal-category-toggle:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.mt-cal-category-toggle.is-active { color: var(--text-normal); background: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-color: color-mix(in srgb, var(--interactive-accent) 22%, transparent); }
+.mt-cal-category-check { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; flex: none; border-radius: 5px; background: var(--background-modifier-border); color: white; font-size: 11px; font-weight: 800; }
+.mt-cal-category-check.mt-cal-color-0 { background: #8b7cf6; }
+.mt-cal-category-check.mt-cal-color-1 { background: #42b883; }
+.mt-cal-category-check.mt-cal-color-2 { background: #e6a23c; }
+.mt-cal-category-check.mt-cal-color-3 { background: #e879a9; }
+.mt-cal-category-check.mt-cal-color-4 { background: #38a6c8; }
+.mt-cal-category-check.mt-cal-color-5 { background: #d97757; }
+.mt-cal-category-check.mt-cal-color-6 { background: #78a85a; }
+.mt-cal-category-check.mt-cal-color-7 { background: #a78bfa; }
+.mt-cal-category-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-ui-small); }
+.mt-cal-workspace-content { min-width: 0; }
+.mt-cal-workspace-content .mt-cal-time-grid { width: 100%; }
+@media (max-width: 760px) {
+  .mt-cal-workspace { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .mt-cal-sidebar { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 8px; }
+  .mt-cal-sidebar-heading { flex-basis: 100%; padding-bottom: 2px; }
+  .mt-cal-category-toggle { width: auto; max-width: 48%; padding: 6px 8px; }
+}
