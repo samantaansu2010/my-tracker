@@ -27,6 +27,7 @@ export class CalendarView extends ItemView {
   private date: string;
   private mode: Mode = "day";
   private filter: Filter = "all";
+  private selectedCategories = new Set<string>();
 
   constructor(leaf: WorkspaceLeaf, private host: TrackerHost) {
     super(leaf);
@@ -43,14 +44,15 @@ export class CalendarView extends ItemView {
   }
 
   getState(): Record<string, unknown> {
-    return { ...super.getState(), date: this.date, mode: this.mode, filter: this.filter };
+    return { ...super.getState(), date: this.date, mode: this.mode, filter: this.filter, selectedCategories: [...this.selectedCategories] };
   }
 
   async setState(state: unknown, result: import("obsidian").ViewStateResult): Promise<void> {
-    const s = state as { date?: unknown; mode?: unknown; filter?: unknown } | null;
+    const s = state as { date?: unknown; mode?: unknown; filter?: unknown; selectedCategories?: unknown } | null;
     if (typeof s?.date === "string" && isDateKey(s.date)) this.date = s.date;
     if (typeof s?.mode === "string" && MODES.includes(s.mode as Mode)) this.mode = s.mode as Mode;
     if (s?.filter === "all" || s?.filter === "scheduled" || s?.filter === "completed") this.filter = s.filter;
+    if (Array.isArray(s?.selectedCategories)) this.selectedCategories = new Set(s.selectedCategories.filter((v): v is string => typeof v === "string"));
     await super.setState(state, result);
     this.render();
   }
@@ -102,29 +104,42 @@ export class CalendarView extends ItemView {
     select.addEventListener("change", () => { this.filter = select.value as Filter; this.render(); });
 
     const all = this.host.store.listAll().filter((e) => this.filter === "all" || (this.filter === "scheduled" ? isScheduled(e) : !isScheduled(e)));
-    // A compact category legend makes the color system discoverable without taking over Obsidian's file sidebar.
     const categories = new Map<string, TrackerEvent>();
     for (const event of all) {
       const category = event.path[0] ?? "Other";
       if (!categories.has(category)) categories.set(category, event);
     }
-    if (categories.size > 0) {
-      const legend = root.createDiv({ cls: "mt-cal-legend", attr: { "aria-label": "Calendar category colors" } });
-      for (const [category, event] of categories) {
-        const item = legend.createDiv({ cls: "mt-cal-legend-item" });
-        item.createSpan({ cls: "mt-cal-legend-dot " + colorClass(event) });
-        item.createSpan({ text: category, cls: "mt-cal-legend-label" });
-      }
+    const shell = root.createDiv({ cls: "mt-cal-workspace" });
+    const sidebar = shell.createDiv({ cls: "mt-cal-sidebar" });
+    sidebar.createDiv({ cls: "mt-cal-sidebar-heading", text: "CATEGORIES" });
+    const allButton = sidebar.createEl("button", { cls: "mt-cal-category-toggle", attr: { type: "button", "aria-pressed": String(this.selectedCategories.size === 0) } });
+    allButton.createSpan({ cls: "mt-cal-category-check", text: this.selectedCategories.size === 0 ? "✓" : "" });
+    allButton.createSpan({ text: "All categories" });
+    if (this.selectedCategories.size === 0) allButton.addClass("is-active");
+    allButton.addEventListener("click", () => { this.selectedCategories.clear(); this.render(); });
+    for (const [category, event] of categories) {
+      const item = sidebar.createEl("button", { cls: "mt-cal-category-toggle", attr: { type: "button", "aria-pressed": String(this.selectedCategories.size === 0 || this.selectedCategories.has(category)) } });
+      item.createSpan({ cls: "mt-cal-category-check " + colorClass(event), text: this.selectedCategories.size === 0 || this.selectedCategories.has(category) ? "✓" : "" });
+      item.createSpan({ cls: "mt-cal-category-label", text: category });
+      if (this.selectedCategories.size === 0 || this.selectedCategories.has(category)) item.addClass("is-active");
+      item.addEventListener("click", () => {
+        if (this.selectedCategories.size === 0) this.selectedCategories = new Set(categories.keys());
+        if (this.selectedCategories.has(category)) this.selectedCategories.delete(category); else this.selectedCategories.add(category);
+        if (this.selectedCategories.size === categories.size) this.selectedCategories.clear();
+        this.render();
+      });
     }
+    const content = shell.createDiv({ cls: "mt-cal-workspace-content" });
+    const visible = all.filter((event) => this.selectedCategories.size === 0 || this.selectedCategories.has(event.path[0] ?? "Other"));
     if (this.mode === "list") {
-      this.renderList(root, all);
+      this.renderList(content, visible);
     } else if (this.mode === "month") {
-      this.renderMonth(root, all);
+      this.renderMonth(content, visible);
     } else if (this.mode === "week") {
       const start = addDays(this.date, -((new Date(this.date + "T12:00:00").getDay() - this.host.settings.weekStartsOn + 7) % 7));
-      this.renderTimeGrid(root, Array.from({ length: 7 }, (_, i) => addDays(start, i)), all);
+      this.renderTimeGrid(content, Array.from({ length: 7 }, (_, i) => addDays(start, i)), visible);
     } else {
-      this.renderTimeGrid(root, [this.date], all);
+      this.renderTimeGrid(content, [this.date], visible);
     }
   }
 
