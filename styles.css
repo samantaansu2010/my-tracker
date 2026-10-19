@@ -597,3 +597,44 @@ rect.mt-heat-c:hover, rect.mt-heat-c:focus-visible { stroke: var(--text-muted); 
 .mt-cal-legend-dot.mt-cal-color-6 { --mt-cal-event-color: #78a85a; }
 .mt-cal-legend-dot.mt-cal-color-7 { --mt-cal-event-color: #a78bfa; }
 .mt-cal-legend-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+/* Keep navigation visible while the user scrolls through a full-day timeline. */
+.mt-calendar .mt-cal-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--background-primary);
+  padding: 10px 0 12px;
+  box-shadow: 0 8px 12px -12px var(--background-modifier-border);
+}
+.mt-calendar .mt-cal-filter {
+  position: sticky;
+  top: 58px;
+  z-index: 19;
+  width: fit-content;
+  padding: 5px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9px;
+  background: var(--background-primary);
+}
+.mt-calendar .mt-cal-time-event.mt-cal-color-0,
+.mt-calendar .mt-cal-month-event.mt-cal-color-0 { --mt-cal-event-color: #8b7cf6; background-color: color-mix(in srgb, #8b7cf6 20%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-1,
+.mt-calendar .mt-cal-month-event.mt-cal-color-1 { --mt-cal-event-color: #42b883; background-color: color-mix(in srgb, #42b883 20%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-2,
+.mt-calendar .mt-cal-month-event.mt-cal-color-2 { --mt-cal-event-color: #e6a23c; background-color: color-mix(in srgb, #e6a23c 20%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-3,
+.mt-calendar .mt-cal-month-event.mt-cal-color-3 { --mt-cal-event-color: #e879a9; background-color: color-mix(in srgb, #e879a9 20%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-4,
+.mt-calendar .mt-cal-month-event.mt-cal-color-4 { --mt-cal-event-color: #38a6c8; background-color: color-mix(in srgb, #38a6c8 20%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-5,
+.mt-calendar .mt-cal-month-event.mt-cal-color-5 { --mt-cal-event-color: #d97757; background-color: color-mix(in srgb, #d97757 20%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-6,
+.mt-calendar .mt-cal-month-event.mt-cal-color-6 { --mt-cal-event-color: #78a85a; background-color: color-mix(in srgb, #78a85a 20%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-7,
+.mt-calendar .mt-cal-month-event.mt-cal-color-7 { --mt-cal-event-color: #a78bfa; background-color: color-mix(in srgb, #a78bfa 20%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.is-scheduled,
+.mt-calendar .mt-cal-month-event.is-scheduled {
+  background-image: repeating-linear-gradient(135deg, transparent, transparent 7px, color-mix(in srgb, var(--mt-cal-event-color) 12%, transparent) 7px, color-mix(in srgb, var(--mt-cal-event-color) 12%, transparent) 14px);
+}
