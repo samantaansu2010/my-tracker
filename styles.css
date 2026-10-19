@@ -665,3 +665,12 @@ rect.mt-heat-c:hover, rect.mt-heat-c:focus-visible { stroke: var(--text-muted); 
   .mt-cal-sidebar-heading { flex-basis: 100%; padding-bottom: 2px; }
   .mt-cal-category-toggle { width: auto; max-width: 48%; padding: 6px 8px; }
 }
+
+
+/* Current-time marker inspired by full-featured weekly calendar timelines. */
+.mt-cal-time-column { position: relative; }
+.mt-cal-now-line { position: absolute; left: 0; right: 0; height: 2px; z-index: 8; pointer-events: none; background: #f08b35; box-shadow: 0 0 0 1px color-mix(in srgb, #f08b35 14%, transparent); }
+.mt-cal-now-line::before { content: ""; position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: #f08b35; box-shadow: 0 0 0 3px color-mix(in srgb, #f08b35 17%, transparent); }
+.mt-cal-time-column.is-today { background-color: color-mix(in srgb, var(--interactive-accent) 2.5%, var(--background-primary)); }
+.mt-cal-time-event { z-index: 3; }
+.mt-cal-time-event:hover { z-index: 9; }
