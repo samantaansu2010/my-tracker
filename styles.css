@@ -501,3 +501,23 @@ rect.mt-heat-c:hover, rect.mt-heat-c:focus-visible { stroke: var(--text-muted); 
   .mt-cal-cell { min-height: 48px; }
   .mt-cal-day-summary, .mt-cal-month-events, .mt-cal-more { display: none; }
 }
+
+/* Readability pass based on live Obsidian screenshots. */
+.mt-cal-time-event { align-items: flex-start; justify-content: flex-start; text-align: left; padding: 6px 8px; gap: 2px; }
+.mt-cal-time-event-time { font-size: 11px; font-weight: 650; line-height: 1.25; color: var(--text-normal); }
+.mt-cal-time-event-title { font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+.mt-cal-time-event-continuation { display: block; font-size: 10px; line-height: 1.25; margin-top: 2px; }
+.mt-cal-month-event { min-height: 23px; padding: 4px 6px; font-size: 11px; gap: 6px; }
+.mt-cal-month-time { font-size: 10px; }
+.mt-cal-month-name { font-size: 11px; }
+.mt-cal-cell { min-height: 124px; padding: 8px; }
+.mt-cal-day-summary { margin: 4px 0 7px; font-size: 11px; }
+.mt-cal-month-events { gap: 4px; }
+.mt-cal-more { padding: 3px 5px; font-size: 11px; font-weight: 600; }
+.mt-cal-time-heading { position: sticky; top: 0; z-index: 5; background: var(--background-secondary); }
+.mt-cal-time-event:focus-visible, .mt-cal-month-event:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+@media (max-width: 720px) {
+  .mt-cal-time-event { padding: 4px 5px; }
+  .mt-cal-time-event-title { font-size: 11px; }
+  .mt-cal-cell { min-height: 86px; }
+}
