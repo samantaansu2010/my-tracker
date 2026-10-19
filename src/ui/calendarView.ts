@@ -161,7 +161,7 @@ export class CalendarView extends ItemView {
         });
         const top = segment.start / 60 * 48;
         const height = Math.max(18, (segment.end - segment.start) / 60 * 48 - 4);
-        button.style.top = `calc(38px + ${top + 2}px)`;
+        button.style.top = `calc(42px + ${top + 2}px)`;
         button.style.height = `${height}px`;
         button.style.left = `calc(${segment.lane / laneCount * 100}% + 2px)`;
         button.style.width = `calc(${100 / laneCount}% - 4px)`;
