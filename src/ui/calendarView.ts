@@ -102,7 +102,7 @@ export class CalendarView extends ItemView {
   }
 
   private renderTimeGrid(parent: HTMLElement, dates: string[], events: TrackerEvent[]): void {
-    const grid = parent.createDiv({ cls: "mt-cal-time-grid" });
+    const grid = parent.createDiv({ cls: "mt-cal-time-grid" + (dates.length === 1 ? " is-day" : "") });
     const gutter = grid.createDiv({ cls: "mt-cal-time-gutter" });
     gutter.createDiv({ cls: "mt-cal-time-heading", text: "Time" });
     for (let hour = 0; hour < 24; hour++) gutter.createDiv({ cls: "mt-cal-hour-label", text: `${String(hour).padStart(2, "0")}:00` });
