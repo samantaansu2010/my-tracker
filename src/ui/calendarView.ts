@@ -78,7 +78,7 @@ export class CalendarView extends ItemView {
     }
     const actions = bar.createDiv({ cls: "mt-cal-actions" });
     actions.createEl("button", { text: "Schedule task", attr: { type: "button" } }).addEventListener("click", () => this.host.openTrack(undefined, { date: this.date, start: "09:00", durationMinutes: 30, status: "scheduled" }));
-    actions.createEl("button", { text: "Track activity", cls: "mod-cta", attr: { type: "button" } }).addEventListener("click", () => this.host.openTrack(undefined, { date: this.date, status: "completed" }));
+    actions.createEl("button", { text: "Track activity", cls: "mod-cta", attr: { type: "button" } }).addEventListener("click", () => this.host.openTrack(undefined, { date: this.date, status: this.date > this.host.today() ? "scheduled" : "completed" }));
 
     const filter = root.createDiv({ cls: "mt-cal-filter" });
     filter.createSpan({ text: "Show:" });
