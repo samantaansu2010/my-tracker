@@ -134,9 +134,9 @@ export class CalendarView extends ItemView {
         const dayOffset = dayStart(date) - dayStart(e.date);
         const absoluteStart = startMinute;
         const absoluteEnd = startMinute + Math.max(1, e.durationMinutes);
-        const segmentStart = dayOffset === 0 ? absoluteStart : dayOffset * 1440;
-        const segmentEnd = Math.min(absoluteEnd, (dayOffset + 1) * 1440);
-        if (dayOffset < 0 || segmentStart >= absoluteEnd || segmentEnd <= segmentStart) return [];
+        const segmentStart = dayOffset === 0 ? absoluteStart : 0;
+        const segmentEnd = Math.min(absoluteEnd - dayOffset * 1440, 1440);
+        if (dayOffset < 0 || absoluteStart + e.durationMinutes <= dayOffset * 1440 || segmentEnd <= segmentStart) return [];
         return [{ event: e, start: segmentStart, end: segmentEnd }];
       }).sort((a, b) => a.start - b.start || b.end - a.end);
 
