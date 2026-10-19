@@ -112,7 +112,9 @@ export class CalendarView extends ItemView {
       const dayButton = heading.createEl("button", { text: formatShortDate(date, this.host.settings.dateFormat), attr: { type: "button", "aria-label": "Open day " + date } });
       if (date === this.host.today()) dayButton.addClass("is-today");
       dayButton.addEventListener("click", () => { this.date = date; this.mode = "day"; this.render(); });
-      const rows = Array.from({ length: 24 }, (_, hour) => {
+      // Keep the 24 hourly slots as the click surface; render events as positioned
+      // overlays so their height reflects duration rather than always one hour.
+      for (let hour = 0; hour < 24; hour++) {
         const slot = col.createDiv({ cls: "mt-cal-hour-slot" });
         slot.addEventListener("click", (event) => {
           if ((event.target as HTMLElement).closest("button")) return;
@@ -121,15 +123,48 @@ export class CalendarView extends ItemView {
           const start = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
           this.host.openTrack(undefined, { date, start, durationMinutes: 60, status: date > this.host.today() ? "scheduled" : "completed" });
         });
-        return slot;
+      }
+
+      const dayStart = (key: string): number => {
+        const [year, month, day] = key.split("-").map(Number);
+        return Date.UTC(year, month - 1, day) / 86400000;
+      };
+      const segments = events.flatMap((e) => {
+        const startMinute = Number(e.timestamp.slice(11, 13)) * 60 + Number(e.timestamp.slice(14, 16));
+        const dayOffset = dayStart(date) - dayStart(e.date);
+        const absoluteStart = startMinute;
+        const absoluteEnd = startMinute + Math.max(1, e.durationMinutes);
+        const segmentStart = dayOffset === 0 ? absoluteStart : dayOffset * 1440;
+        const segmentEnd = Math.min(absoluteEnd, (dayOffset + 1) * 1440);
+        if (dayOffset < 0 || segmentStart >= absoluteEnd || segmentEnd <= segmentStart) return [];
+        return [{ event: e, start: segmentStart, end: segmentEnd }];
+      }).sort((a, b) => a.start - b.start || b.end - a.end);
+
+      // Greedy interval lanes prevent simultaneous events from completely covering one another.
+      const laneEnds: number[] = [];
+      const positioned = segments.map((segment) => {
+        let lane = laneEnds.findIndex((end) => end <= segment.start);
+        if (lane < 0) lane = laneEnds.length;
+        laneEnds[lane] = segment.end;
+        return { ...segment, lane };
       });
-      for (const e of events.filter((item) => item.date === date)) {
-        const hour = Number(e.timestamp.slice(11, 13));
-        const slot = rows[Number.isFinite(hour) && hour >= 0 && hour < 24 ? hour : 0];
-        const button = slot.createEl("button", { cls: "mt-cal-time-event" + (isScheduled(e) ? " is-scheduled" : ""), attr: { type: "button", "aria-label": `Edit ${e.path.join(" ")} at ${e.timestamp.slice(11, 16)}` } });
-        button.createSpan({ cls: "mt-cal-time-event-time", text: e.timestamp.slice(11, 16) });
-        button.createSpan({ cls: "mt-cal-time-event-title", text: e.path.join(" › ") });
-        button.addEventListener("click", (event) => { event.stopPropagation(); this.host.openTrack(e); });
+      const laneCount = Math.max(1, laneEnds.length);
+      for (const segment of positioned) {
+        const button = col.createEl("button", {
+          cls: "mt-cal-time-event" + (isScheduled(segment.event) ? " is-scheduled" : ""),
+          attr: { type: "button", "aria-label": `Edit ${segment.event.path.join(" ")} at ${segment.event.timestamp.slice(11, 16)}, ${segment.event.durationMinutes} minutes` },
+        });
+        const top = segment.start / 60 * 48;
+        const height = Math.max(18, (segment.end - segment.start) / 60 * 48 - 4);
+        button.style.top = `${top + 2}px`;
+        button.style.height = `${height}px`;
+        button.style.left = `calc(${segment.lane / laneCount * 100}% + 2px)`;
+        button.style.width = `calc(${100 / laneCount}% - 4px)`;
+        button.createSpan({ cls: "mt-cal-time-event-time", text: segment.event.timestamp.slice(11, 16) });
+        button.createSpan({ cls: "mt-cal-time-event-title", text: segment.event.path.join(" › ") });
+        if (dayStart(date) > dayStart(segment.event.date)) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continued from previous day" });
+        if (segment.end === 1440 && segment.event.durationMinutes > segment.end - (segment.start === 0 ? 0 : segment.start)) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continues next day" });
+        button.addEventListener("click", (event) => { event.stopPropagation(); this.host.openTrack(segment.event); });
       }
     }
   }
