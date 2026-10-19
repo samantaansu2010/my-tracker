@@ -582,3 +582,18 @@ rect.mt-heat-c:hover, rect.mt-heat-c:focus-visible { stroke: var(--text-muted); 
 .mt-cal-month-event.is-scheduled { border-style: dashed; }
 .mt-cal-time-event:active, .mt-cal-month-event:active { transform: scale(.995); }
 .mt-cal-time-event:focus-visible, .mt-cal-month-event:focus-visible { z-index: 6; outline: 2px solid var(--mt-cal-event-color); outline-offset: 1px; }
+
+
+/* Compact category legend, inspired by calendar app filters but native to the Obsidian workspace. */
+.mt-cal-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 15px; padding: 10px 2px 2px; }
+.mt-cal-legend-item { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-muted); font-size: var(--font-ui-small); }
+.mt-cal-legend-dot { width: 9px; height: 9px; flex: none; border-radius: 3px; background: var(--mt-cal-event-color, var(--interactive-accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mt-cal-event-color, var(--interactive-accent)) 13%, transparent); }
+.mt-cal-legend-dot.mt-cal-color-0 { --mt-cal-event-color: #8b7cf6; }
+.mt-cal-legend-dot.mt-cal-color-1 { --mt-cal-event-color: #42b883; }
+.mt-cal-legend-dot.mt-cal-color-2 { --mt-cal-event-color: #e6a23c; }
+.mt-cal-legend-dot.mt-cal-color-3 { --mt-cal-event-color: #e879a9; }
+.mt-cal-legend-dot.mt-cal-color-4 { --mt-cal-event-color: #38a6c8; }
+.mt-cal-legend-dot.mt-cal-color-5 { --mt-cal-event-color: #d97757; }
+.mt-cal-legend-dot.mt-cal-color-6 { --mt-cal-event-color: #78a85a; }
+.mt-cal-legend-dot.mt-cal-color-7 { --mt-cal-event-color: #a78bfa; }
+.mt-cal-legend-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
