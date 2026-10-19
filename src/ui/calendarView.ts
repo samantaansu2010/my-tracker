@@ -48,11 +48,17 @@ export class CalendarView extends ItemView {
     root.empty();
     const bar = root.createDiv({ cls: "mt-cal-bar" });
     const nav = bar.createDiv({ cls: "mt-cal-nav" });
+    const shiftMonth = (date: string, delta: number): string => {
+      const [year, month, day] = date.split("-").map(Number);
+      const target = new Date(year, month - 1 + delta, 1, 12);
+      const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+      target.setDate(Math.min(day, lastDay));
+      return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
+    };
     const step = (label: string, delta: number) => {
       const b = nav.createEl("button", { text: label, attr: { type: "button" } });
       b.addEventListener("click", () => {
-        const amount = this.mode === "week" ? 7 : this.mode === "month" ? 30 : 1;
-        this.date = addDays(this.date, delta * amount);
+        this.date = this.mode === "month" ? shiftMonth(this.date, delta) : addDays(this.date, delta * (this.mode === "week" ? 7 : 1));
         this.render();
       });
     };
@@ -115,7 +121,8 @@ export class CalendarView extends ItemView {
     const offset = (new Date(first + "T12:00:00").getDay() - this.host.settings.weekStartsOn + 7) % 7;
     const start = addDays(first, -offset);
     const grid = parent.createDiv({ cls: "mt-cal-month" });
-    for (const label of ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) grid.createDiv({ cls: "mt-cal-weekday", text: label });
+    const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    for (let i = 0; i < 7; i++) grid.createDiv({ cls: "mt-cal-weekday", text: weekdays[(this.host.settings.weekStartsOn + i) % 7] });
     for (let i = 0; i < 42; i++) {
       const date = addDays(start, i);
       const cell = grid.createDiv({ cls: "mt-cal-cell" });
