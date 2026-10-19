@@ -182,15 +182,31 @@ export class CalendarView extends ItemView {
         return [{ event: e, start: segmentStart, end: segmentEnd }];
       }).sort((a, b) => a.start - b.start || b.end - a.end);
 
-      // Greedy interval lanes prevent simultaneous events from completely covering one another.
-      const laneEnds: number[] = [];
-      const positioned = segments.map((segment) => {
-        let lane = laneEnds.findIndex((end) => end <= segment.start);
-        if (lane < 0) lane = laneEnds.length;
-        laneEnds[lane] = segment.end;
-        return { ...segment, lane };
-      });
-      const laneCount = Math.max(1, laneEnds.length);
+      // Split the day into overlap clusters. Events only share horizontal space
+      // with events that actually overlap; unrelated later events regain full width.
+      const positioned: Array<typeof segments[number] & { lane: number; laneCount: number }> = [];
+      let cluster: typeof segments = [];
+      let clusterEnd = -1;
+      const placeCluster = () => {
+        if (!cluster.length) return;
+        const laneEnds: number[] = [];
+        const placed = cluster.map((segment) => {
+          let lane = laneEnds.findIndex((end) => end <= segment.start);
+          if (lane < 0) lane = laneEnds.length;
+          laneEnds[lane] = segment.end;
+          return { ...segment, lane };
+        });
+        const count = Math.max(1, laneEnds.length);
+        positioned.push(...placed.map((segment) => ({ ...segment, laneCount: count })));
+        cluster = [];
+        clusterEnd = -1;
+      };
+      for (const segment of segments) {
+        if (cluster.length && segment.start >= clusterEnd) placeCluster();
+        cluster.push(segment);
+        clusterEnd = Math.max(clusterEnd, segment.end);
+      }
+      placeCluster();
       for (const segment of positioned) {
         const button = col.createEl("button", {
           cls: "mt-cal-time-event " + colorClass(segment.event) + (isScheduled(segment.event) ? " is-scheduled" : ""),
@@ -200,8 +216,8 @@ export class CalendarView extends ItemView {
         const height = Math.max(18, (segment.end - segment.start) / 60 * 48 - 4);
         button.style.top = `calc(42px + ${top + 2}px)`;
         button.style.height = `${height}px`;
-        button.style.left = `calc(${segment.lane / laneCount * 100}% + 2px)`;
-        button.style.width = `calc(${100 / laneCount}% - 4px)`;
+        button.style.left = `calc(${segment.lane / segment.laneCount * 100}% + 2px)`;
+        button.style.width = `calc(${100 / segment.laneCount}% - 4px)`;
         button.createSpan({ cls: "mt-cal-time-event-time", text: segment.event.timestamp.slice(11, 16) });
         button.createSpan({ cls: "mt-cal-time-event-title", text: segment.event.path.join(" › ") });
         if (dayStart(date) > dayStart(segment.event.date)) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continued from previous day" });
