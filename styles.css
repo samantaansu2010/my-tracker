@@ -428,3 +428,5 @@ rect.mt-heat-c:hover, rect.mt-heat-c:focus-visible { stroke: var(--text-muted); 
 .mt-cal-time-event-time { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .mt-cal-time-event-title { font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .mt-cal-time-grid { grid-template-columns: 42px repeat(auto-fit, minmax(105px, 1fr)); } .mt-cal-time-event-title { font-size: 10px; } }
+
+.mt-cal-time-grid.is-day { grid-template-columns: 52px minmax(180px, 1fr); }
