@@ -118,7 +118,7 @@ export class CalendarView extends ItemView {
           if ((event.target as HTMLElement).closest("button")) return;
           const rect = slot.getBoundingClientRect();
           const minute = Math.max(0, Math.min(59, Math.floor(((event as MouseEvent).clientY - rect.top) / Math.max(1, rect.height) * 60)));
-          const start = `${String(hour).padStart(2, "0")}:${String(Math.floor(minute / 5) * 5).padStart(2, "0")}`;
+          const start = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
           this.host.openTrack(undefined, { date, start, durationMinutes: 60, status: date > this.host.today() ? "scheduled" : "completed" });
         });
         return slot;
