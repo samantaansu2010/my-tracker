@@ -694,3 +694,45 @@ rect.mt-heat-c:hover, rect.mt-heat-c:focus-visible { stroke: var(--text-muted); 
 .mt-cal-month-event:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .mt-cal-category-toggle:focus-visible, .mt-cal-time-event:focus-visible, .mt-cal-month-event:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .mt-cal-category-toggle, .mt-cal-hour-slot, .mt-cal-time-event, .mt-cal-month .mt-cal-cell, .mt-cal-month-event { transition: none; } }
+
+
+/* Calendar finishing pass: more legible colored cards and fine-grained timeline rhythm. */
+.mt-calendar .mt-cal-time-column {
+  background-image:
+    linear-gradient(to bottom, transparent 23px, color-mix(in srgb, var(--background-modifier-border) 40%, transparent) 24px, transparent 25px),
+    linear-gradient(to bottom, transparent 47px, color-mix(in srgb, var(--background-modifier-border) 90%, transparent) 48px);
+  background-size: 100% 48px, 100% 48px;
+  background-repeat: repeat-y;
+}
+.mt-calendar .mt-cal-time-event.mt-cal-color-0 { --mt-cal-event-color: #8b7cf6; background: color-mix(in srgb, #8b7cf6 22%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-1 { --mt-cal-event-color: #42b883; background: color-mix(in srgb, #42b883 22%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-2 { --mt-cal-event-color: #e6a23c; background: color-mix(in srgb, #e6a23c 22%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-3 { --mt-cal-event-color: #e879a9; background: color-mix(in srgb, #e879a9 22%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-4 { --mt-cal-event-color: #38a6c8; background: color-mix(in srgb, #38a6c8 22%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-5 { --mt-cal-event-color: #d97757; background: color-mix(in srgb, #d97757 22%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-6 { --mt-cal-event-color: #78a85a; background: color-mix(in srgb, #78a85a 22%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.mt-cal-color-7 { --mt-cal-event-color: #a78bfa; background: color-mix(in srgb, #a78bfa 22%, var(--background-secondary)); }
+.mt-calendar .mt-cal-month-event.mt-cal-color-0 { --mt-cal-event-color: #8b7cf6; background: color-mix(in srgb, #8b7cf6 18%, var(--background-secondary)); }
+.mt-calendar .mt-cal-month-event.mt-cal-color-1 { --mt-cal-event-color: #42b883; background: color-mix(in srgb, #42b883 18%, var(--background-secondary)); }
+.mt-calendar .mt-cal-month-event.mt-cal-color-2 { --mt-cal-event-color: #e6a23c; background: color-mix(in srgb, #e6a23c 18%, var(--background-secondary)); }
+.mt-calendar .mt-cal-month-event.mt-cal-color-3 { --mt-cal-event-color: #e879a9; background: color-mix(in srgb, #e879a9 18%, var(--background-secondary)); }
+.mt-calendar .mt-cal-month-event.mt-cal-color-4 { --mt-cal-event-color: #38a6c8; background: color-mix(in srgb, #38a6c8 18%, var(--background-secondary)); }
+.mt-calendar .mt-cal-month-event.mt-cal-color-5 { --mt-cal-event-color: #d97757; background: color-mix(in srgb, #d97757 18%, var(--background-secondary)); }
+.mt-calendar .mt-cal-month-event.mt-cal-color-6 { --mt-cal-event-color: #78a85a; background: color-mix(in srgb, #78a85a 18%, var(--background-secondary)); }
+.mt-calendar .mt-cal-month-event.mt-cal-color-7 { --mt-cal-event-color: #a78bfa; background: color-mix(in srgb, #a78bfa 18%, var(--background-secondary)); }
+.mt-calendar .mt-cal-time-event.is-scheduled,
+.mt-calendar .mt-cal-month-event.is-scheduled {
+  background-image: repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--mt-cal-event-color) 13%, transparent) 7px 14px);
+  border-style: dashed;
+}
+.mt-calendar .mt-cal-time-event:focus-visible,
+.mt-calendar .mt-cal-month-event:focus-visible,
+.mt-calendar .mt-cal-category-toggle:focus-visible {
+  outline: 2px solid var(--mt-cal-event-color, var(--interactive-accent));
+  outline-offset: 2px;
+}
+.mt-calendar .mt-cal-time-heading button { transition: background-color .15s ease, color .15s ease; }
+.mt-calendar .mt-cal-time-heading button:hover { background: var(--background-modifier-hover); }
+@media (prefers-reduced-motion: reduce) {
+  .mt-calendar * { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: 0s !important; }
+}
