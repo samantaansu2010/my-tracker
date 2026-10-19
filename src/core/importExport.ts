@@ -22,7 +22,7 @@ export function parseBundle(text: string): { events: unknown[]; settings?: unkno
   return { events: [], error: "File does not look like a My Tracker export (no events array)." };
 }
 
-export const CSV_COLUMNS = ["id", "timestamp", "date", "category", "subject", "subsubject", "topic", "path", "duration_minutes", "kind", "result", "planned_minutes", "tags", "scores", "notes", "source"] as const;
+export const CSV_COLUMNS = ["id", "timestamp", "date", "category", "subject", "subsubject", "topic", "path", "duration_minutes", "kind", "result", "planned_minutes", "tags", "scores", "notes", "source", "status"] as const;
 
 const csvCell = (v: unknown): string => {
   const s = v === undefined || v === null ? "" : String(v);
@@ -32,7 +32,7 @@ const csvCell = (v: unknown): string => {
 export function eventsToCsv(events: TrackerEvent[]): string {
   const rows = events.map((e) => [
     e.id, e.timestamp, e.date, e.path[0], e.path[1], e.path[2], e.path[3], e.path.join(" > "), e.durationMinutes, e.kind, e.result, e.plannedMinutes,
-    e.tags.join(";"), e.scores ? Object.entries(e.scores).map(([k, v]) => `${k}=${v}`).join(";") : "", e.notes, e.source,
+    e.tags.join(";"), e.scores ? Object.entries(e.scores).map(([k, v]) => `${k}=${v}`).join(";") : "", e.notes, e.source, e.status ?? "completed",
   ].map(csvCell).join(","));
   return [CSV_COLUMNS.join(","), ...rows].join("\r\n") + "\r\n";
 }
@@ -77,6 +77,7 @@ export function csvToRawEvents(text: string, defaultUnit: "minutes" | "hours" = 
     out.durationMinutes = mins !== undefined ? Number(mins) : dur !== undefined ? parseDuration(dur, defaultUnit) ?? NaN : NaN;
     const planned = col(r, "planned_minutes", "plannedminutes"); if (planned) out.plannedMinutes = Number(planned);
     for (const k of ["kind", "result", "notes", "source"]) { const v = col(r, k); if (v !== undefined) out[k] = v; }
+    const status = col(r, "status"); if (status === "scheduled") out.status = "scheduled";
     const tags = col(r, "tags"); if (tags) out.tags = tags.split(/[;,]/).map((t) => t.trim()).filter(Boolean);
     const scores = col(r, "scores");
     if (scores) { const o: Record<string, number> = {}; for (const part of scores.split(";")) { const [k, v] = part.split("="); if (k && v !== undefined && Number.isFinite(Number(v))) o[k.trim()] = Number(v); } out.scores = o; }
