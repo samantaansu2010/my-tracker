@@ -9,7 +9,7 @@ export async function createBackup(io: StorageIO, dir: string, store: EventStore
   if (!(await io.exists(dir))) await io.mkdir(dir);
   let path = `${dir}/backup-${stamp(now)}.json`;
   for (let i = 1; await io.exists(path); i++) path = `${dir}/backup-${stamp(now)}-${i}.json`;
-  await io.write(path, JSON.stringify(buildBundle(store.list(), settings, now), null, 1));
+  await io.write(path, JSON.stringify(buildBundle(store.listAll(), settings, now), null, 1));
   return path;
 }
 
