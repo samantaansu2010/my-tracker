@@ -5,6 +5,12 @@ import { addDays, formatDateKey, formatShortDate, isDateKey } from "../core/date
 import { isScheduled } from "../core/schedule";
 
 export const CALENDAR_VIEW_TYPE = "my-tracker-calendar";
+
+function formatMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? (remainder ? `${hours}h ${remainder}m` : `${hours}h`) : `${remainder}m`;
+}
 type Mode = "day" | "week" | "month" | "list";
 type Filter = "all" | "scheduled" | "completed";
 const MODES: Mode[] = ["day", "week", "month", "list"];
@@ -88,7 +94,6 @@ export class CalendarView extends ItemView {
     select.addEventListener("change", () => { this.filter = select.value as Filter; this.render(); });
 
     const all = this.host.store.listAll().filter((e) => this.filter === "all" || (this.filter === "scheduled" ? isScheduled(e) : !isScheduled(e)));
-    const entries = all.filter((e) => e.date === this.date || e.timestamp.slice(0, 10) === this.date);
     if (this.mode === "list") {
       this.renderList(root, all);
     } else if (this.mode === "month") {
@@ -107,7 +112,7 @@ export class CalendarView extends ItemView {
     gutter.createDiv({ cls: "mt-cal-time-heading", text: "Time" });
     for (let hour = 0; hour < 24; hour++) gutter.createDiv({ cls: "mt-cal-hour-label", text: `${String(hour).padStart(2, "0")}:00` });
     for (const date of dates) {
-      const col = grid.createDiv({ cls: "mt-cal-time-column" });
+      const col = grid.createDiv({ cls: "mt-cal-time-column" + (date === this.host.today() ? " is-today" : "") });
       const heading = col.createDiv({ cls: "mt-cal-time-heading" });
       const dayButton = heading.createEl("button", { text: formatShortDate(date, this.host.settings.dateFormat), attr: { type: "button", "aria-label": "Open day " + date } });
       if (date === this.host.today()) dayButton.addClass("is-today");
@@ -163,7 +168,7 @@ export class CalendarView extends ItemView {
         button.createSpan({ cls: "mt-cal-time-event-time", text: segment.event.timestamp.slice(11, 16) });
         button.createSpan({ cls: "mt-cal-time-event-title", text: segment.event.path.join(" › ") });
         if (dayStart(date) > dayStart(segment.event.date)) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continued from previous day" });
-        if (segment.end === 1440 && segment.event.durationMinutes > segment.end - (segment.start === 0 ? 0 : segment.start)) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continues next day" });
+        if (segment.end === 1440 && segment.start + segment.event.durationMinutes > 1440) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continues next day" });
         button.addEventListener("click", (event) => { event.stopPropagation(); this.host.openTrack(segment.event); });
       }
     }
@@ -194,8 +199,25 @@ export class CalendarView extends ItemView {
       const b = cell.createEl("button", { text: String(Number(date.slice(8, 10))), attr: { type: "button", "aria-label": "Open " + date } });
       if (date === this.host.today()) b.addClass("is-today");
       b.addEventListener("click", () => { this.date = date; this.mode = "day"; this.render(); });
-      const rows = events.filter((e) => e.date === date);
-      if (rows.length) cell.createDiv({ cls: "mt-cal-count", text: String(rows.length) + (rows.some(isScheduled) ? " · ◷" : "") });
+      const rows = events.filter((e) => e.date === date).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      if (date === this.host.today()) cell.addClass("is-today");
+      if (date === this.date) cell.addClass("is-selected");
+      if (rows.length) {
+        const summary = cell.createDiv({ cls: "mt-cal-day-summary" });
+        const minutes = rows.filter((e) => !isScheduled(e)).reduce((sum, e) => sum + e.durationMinutes, 0);
+        const planned = rows.filter(isScheduled).reduce((sum, e) => sum + e.durationMinutes, 0);
+        summary.createSpan({ text: rows.length + (rows.length === 1 ? " entry" : " entries") });
+        if (minutes) summary.createSpan({ text: formatMinutes(minutes), cls: "mt-cal-day-total" });
+        if (planned) summary.createSpan({ text: "◷ " + formatMinutes(planned), cls: "mt-cal-day-planned" });
+        const chips = cell.createDiv({ cls: "mt-cal-month-events" });
+        for (const e of rows.slice(0, 3)) {
+          const chip = chips.createEl("button", { cls: "mt-cal-month-event" + (isScheduled(e) ? " is-scheduled" : ""), attr: { type: "button", title: e.path.join(" › ") + " · " + formatMinutes(e.durationMinutes) } });
+          chip.createSpan({ cls: "mt-cal-month-time", text: e.timestamp.slice(11, 16) });
+          chip.createSpan({ cls: "mt-cal-month-name", text: e.path[e.path.length - 1] ?? e.path.join(" › ") });
+          chip.addEventListener("click", (event) => { event.stopPropagation(); this.host.openTrack(e); });
+        }
+        if (rows.length > 3) cell.createDiv({ cls: "mt-cal-more", text: "+" + (rows.length - 3) + " more" });
+      }
     }
   }
 
