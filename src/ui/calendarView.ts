@@ -207,6 +207,11 @@ export class CalendarView extends ItemView {
         clusterEnd = Math.max(clusterEnd, segment.end);
       }
       placeCluster();
+      if (date === this.host.today()) {
+        const now = new Date();
+        const nowLine = col.createDiv({ cls: "mt-cal-now-line", attr: { "aria-label": "Current time" } });
+        nowLine.style.top = `calc(42px + ${(now.getHours() * 60 + now.getMinutes()) / 60 * 48}px)`;
+      }
       for (const segment of positioned) {
         const button = col.createEl("button", {
           cls: "mt-cal-time-event " + colorClass(segment.event) + (isScheduled(segment.event) ? " is-scheduled" : ""),
