@@ -179,7 +179,7 @@ export class CalendarView extends ItemView {
         const segmentStart = dayOffset === 0 ? absoluteStart : 0;
         const segmentEnd = Math.min(absoluteEnd - dayOffset * 1440, 1440);
         if (dayOffset < 0 || absoluteStart + e.durationMinutes <= dayOffset * 1440 || segmentEnd <= segmentStart) return [];
-        return [{ event: e, start: segmentStart, end: segmentEnd }];
+        return [{ event: e, start: segmentStart, end: segmentEnd, continuedFromPrevious: dayOffset > 0, continuesNext: absoluteEnd - dayOffset * 1440 > 1440 }];
       }).sort((a, b) => a.start - b.start || b.end - a.end);
 
       // Split the day into overlap clusters. Events only share horizontal space
@@ -223,10 +223,10 @@ export class CalendarView extends ItemView {
         button.style.height = `${height}px`;
         button.style.left = `calc(${segment.lane / segment.laneCount * 100}% + 2px)`;
         button.style.width = `calc(${100 / segment.laneCount}% - 4px)`;
-        button.createSpan({ cls: "mt-cal-time-event-time", text: segment.event.timestamp.slice(11, 16) });
+        button.createSpan({ cls: "mt-cal-time-event-time", text: segment.continuedFromPrevious ? "00:00 · continuation" : segment.event.timestamp.slice(11, 16) });
         button.createSpan({ cls: "mt-cal-time-event-title", text: segment.event.path.join(" › ") });
-        if (dayStart(date) > dayStart(segment.event.date)) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continued from previous day" });
-        if (segment.end === 1440 && segment.start + segment.event.durationMinutes > 1440) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continues next day" });
+        if (segment.continuedFromPrevious) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continued from previous day" });
+        if (segment.continuesNext) button.createSpan({ cls: "mt-cal-time-event-continuation", text: "Continues next day" });
         button.addEventListener("click", (event) => { event.stopPropagation(); this.host.openTrack(segment.event); });
       }
     }
@@ -274,7 +274,10 @@ export class CalendarView extends ItemView {
           chip.createSpan({ cls: "mt-cal-month-name", text: e.path[e.path.length - 1] ?? e.path.join(" › ") });
           chip.addEventListener("click", (event) => { event.stopPropagation(); this.host.openTrack(e); });
         }
-        if (rows.length > 3) cell.createDiv({ cls: "mt-cal-more", text: "+" + (rows.length - 3) + " more" });
+        if (rows.length > 3) {
+        const more = cell.createEl("button", { cls: "mt-cal-more", text: "+" + (rows.length - 3) + " more", attr: { type: "button", "aria-label": "Show all " + rows.length + " entries for " + date } });
+        more.addEventListener("click", (event) => { event.stopPropagation(); this.date = date; this.mode = "day"; this.render(); });
+      }
       }
     }
   }
