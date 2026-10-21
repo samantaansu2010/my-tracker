@@ -16,6 +16,8 @@ export interface TrackerEvent {
   result?: string;
   scores?: Record<string, number>;
   plannedMinutes?: number;
+  /** Planned work is excluded from actual-time analytics until completed. */
+  status?: "scheduled";
   tags: string[];
   notes: string;
   source: string;

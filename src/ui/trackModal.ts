@@ -1,6 +1,7 @@
 import { renderRecentChips } from "./recentChips";
 import { Modal, Notice } from "obsidian";
-import type { TrackerHost } from "../host";
+import type { TrackerHost, TrackInit } from "../host";
+import { isScheduled } from "../core/schedule";
 import type { TrackerEvent } from "../core/types";
 import { parseEntry, type ParsedEntry } from "../core/parser";
 import { formatDuration, parseDuration } from "../core/duration";
@@ -8,7 +9,7 @@ import { formatLocalIso } from "../core/dates";
 import { canonicalizePath, childNames, ensurePath, suggest, type Ranked } from "../core/hierarchy";
 import { normalize } from "../core/text";
 
-type Field = "path" | "duration" | "result" | "kind" | "tags" | "notes" | "time" | "planned" | "scores";
+type Field = "path" | "duration" | "result" | "kind" | "tags" | "notes" | "time" | "planned" | "scores" | "status";
 
 /** Fast entry: one line of text with live preview + autocomplete, plus an optional detailed form. */
 export class TrackModal extends Modal {
@@ -20,7 +21,7 @@ export class TrackModal extends Modal {
   private suggestions: Ranked[] = []; private sel = -1; private tokensReplaced = 0;
   private saving = false;
 
-  constructor(private host: TrackerHost, private editing?: TrackerEvent) { super(host.app); }
+  constructor(private host: TrackerHost, private editing?: TrackerEvent, private init?: TrackInit) { super(host.app); }
 
   onOpen(): void {
     const { contentEl } = this;
@@ -44,6 +45,16 @@ export class TrackModal extends Modal {
     contentEl.createDiv({ cls: "mt-muted mt-hint", text: this.editing || this.host.settings.dashboard.mode === "simple" ? "" : "Enter saves · Shift+Enter saves and keeps the window open · Tab accepts a suggestion" });
     contentEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void this.save(false); } });
     if (this.editing) this.prefill(this.editing);
+    else if (this.init) {
+      if (this.init.date || this.init.start) {
+        const date = this.init.date ?? this.host.today();
+        const start = this.init.start ?? "09:00";
+        (this.f.time as HTMLInputElement).value = `${date}T${start}`;
+        this.dirty.add("time");
+      }
+      if (this.init.durationMinutes) { (this.f.duration as HTMLInputElement).value = formatDuration(this.init.durationMinutes); this.dirty.add("duration"); }
+      this.dirty.add("status");
+    }
     this.refresh();
   }
   onClose(): void { this.contentEl.empty(); }
@@ -78,6 +89,11 @@ export class TrackModal extends Modal {
     kind.addEventListener("change", () => { this.dirty.add("kind"); this.refresh(); }); this.f.kind = kind;
     const when = row("Date & time", (c) => c.createEl("input", { attr: { type: "datetime-local" } })) as HTMLInputElement;
     when.addEventListener("input", () => { this.dirty.add("time"); this.refresh(); }); this.f.time = when;
+    const status = row("Status", (c) => c.createEl("select")) as HTMLSelectElement;
+    status.createEl("option", { text: "Completed", attr: { value: "completed" } });
+    status.createEl("option", { text: "Scheduled", attr: { value: "scheduled" } });
+    status.value = this.init?.status ?? (this.editing && isScheduled(this.editing) ? "scheduled" : "completed");
+    status.addEventListener("change", () => { this.dirty.add("status"); this.refresh(); }); this.f.status = status;
     const plan = row("Planned (optional)", (c) => c.createEl("input", { attr: { type: "text", placeholder: "e.g. 1h" } })) as HTMLInputElement;
     plan.addEventListener("input", () => { this.dirty.add("planned"); this.refresh(); }); this.f.planned = plan;
     const tags = row("Tags", (c) => c.createEl("input", { attr: { type: "text", placeholder: "exam-preparation, revision" } })) as HTMLInputElement;
@@ -99,8 +115,9 @@ export class TrackModal extends Modal {
     set("duration", formatDuration(e.durationMinutes)); set("result", e.result ?? ""); set("kind", e.kind ?? "");
     set("time", e.timestamp.slice(0, 16)); set("planned", e.plannedMinutes ? formatDuration(e.plannedMinutes) : "");
     set("tags", e.tags.join(", ")); set("notes", e.notes);
+    (this.f.status as HTMLSelectElement).value = isScheduled(e) ? "scheduled" : "completed";
     for (const [k, el] of this.scoreEls) el.value = e.scores?.[k] !== undefined ? String(e.scores[k]) : "";
-    (["path", "duration", "result", "kind", "tags", "notes", "time", "planned", "scores"] as Field[]).forEach((d) => this.dirty.add(d));
+    (["path", "duration", "result", "kind", "tags", "notes", "time", "planned", "scores", "status"] as Field[]).forEach((d) => this.dirty.add(d));
     // Keep exact minutes if the user does not touch the duration box (formatDuration rounds for display).
     this.exactDuration = e.durationMinutes; this.exactPlanned = e.plannedMinutes;
   }
@@ -171,7 +188,8 @@ export class TrackModal extends Modal {
       }
       if (!Object.keys(scores).length) scores = undefined;
     }
-    return { path, duration, timestamp, result, kind, tags, notes, planned, scores, errors, warnings, existingDepth: this.dirty.has("path") ? this.countExisting(path) : p?.existingDepth ?? 0 };
+    const status = (this.f.status as HTMLSelectElement | undefined)?.value === "scheduled" ? "scheduled" as const : undefined;
+    return { path, duration, timestamp, result, kind, tags, notes, planned, scores, status, errors, warnings, existingDepth: this.dirty.has("path") ? this.countExisting(path) : p?.existingDepth ?? 0 };
   }
   private countExisting(path: string[]): number {
     const c = canonicalizePath(this.host.settings.tree, path);
@@ -250,7 +268,7 @@ export class TrackModal extends Modal {
     try {
       const tree = this.host.settings.tree;
       const path = canonicalizePath(tree, d.path);
-      const input = { timestamp: d.timestamp, path, durationMinutes: d.duration, kind: d.kind, result: d.result, scores: d.scores, plannedMinutes: d.planned, tags: d.tags, notes: d.notes, source: this.editing?.source ?? "manual" };
+      const input = { timestamp: d.timestamp, path, durationMinutes: d.duration, kind: d.kind, result: d.result, scores: d.scores, plannedMinutes: d.planned, status: d.status, tags: d.tags, notes: d.notes, source: this.editing?.source ?? "manual" };
       const res = this.editing ? await this.host.store.update(this.editing.id, input) : await this.host.store.add(input, { allowDuplicate: force });
       if (!res.ok) {
         if (res.reason === "duplicate") this.showMsg("An identical event already exists (same time, subject, duration, result and notes).", true);

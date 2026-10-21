@@ -3,6 +3,8 @@ import type { EventStore } from "./core/store";
 import type { ResolveOpts } from "./core/dates";
 import type { TrackerEvent, TrackerSettings } from "./core/types";
 
+export interface TrackInit { date?: string; start?: string; durationMinutes?: number; status?: "scheduled" | "completed"; }
+
 export interface TrackerPaths { root: string; database: string; subjects: string; templates: string; dashboard: string; reports: string; backups: string }
 
 /** What UI components may use from the plugin. Keeps views/modals decoupled from the Plugin class. */
@@ -15,7 +17,9 @@ export interface TrackerHost {
   now(): Date;
   today(): string;
   resolveOpts(): ResolveOpts;
-  openTrack(event?: TrackerEvent): void;
+  openTrack(event?: TrackerEvent, init?: TrackInit): void;
+  openScheduled(): void;
+  openCalendar(date?: string): Promise<void>;
   openAnalysis(): Promise<void>;
   openDrill(title: string, query: () => TrackerEvent[]): void;
 

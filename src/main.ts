@@ -1,10 +1,10 @@
 import { AnalysisView, ANALYSIS_VIEW_TYPE } from "./ui/analysisView";
 import { Notice, Plugin, normalizePath, requestUrl, TFile } from "obsidian";
-import type { TrackerHost, TrackerPaths } from "./host";
+import type { TrackerHost, TrackerPaths, TrackInit } from "./host";
 import type { TrackerEvent, TrackerSettings } from "./core/types";
 import { EventStore, type ImportReport } from "./core/store";
 import { createDefaultSettings, loadSettings } from "./core/defaults";
-import { addDays, formatLocalIso, resolveRange, toDateKey, type ResolveOpts } from "./core/dates";
+import { addDays, formatLocalIso, isDateKey, resolveRange, toDateKey, type ResolveOpts } from "./core/dates";
 import { ensurePath } from "./core/hierarchy";
 import { createBackup, backupDue, pruneBackups, stamp } from "./core/backup";
 import { buildBundle, eventsToCsv } from "./core/importExport";
@@ -13,6 +13,7 @@ import { formatDuration } from "./core/duration";
 import { aggregateAw, fetchWindowEvents, testConnection, type HttpFn } from "./integrations/activitywatch";
 import { ObsidianIO, createStructure, ensureFolder, pathsFor } from "./obsidianIO";
 import { DashboardView, VIEW_TYPE } from "./ui/dashboard";
+import { CalendarView, CALENDAR_VIEW_TYPE } from "./ui/calendarView";
 import { TrackModal } from "./ui/trackModal";
 import { DrillModal } from "./ui/drilldown";
 import { SetupWizard } from "./ui/setupWizard";
@@ -34,6 +35,7 @@ export default class MyTrackerPlugin extends Plugin implements TrackerHost {
     this.bindStore();
 
     this.registerView(VIEW_TYPE, (leaf) => new DashboardView(leaf, this));
+    this.registerView(CALENDAR_VIEW_TYPE, (leaf) => new CalendarView(leaf, this));
     this.registerView(ANALYSIS_VIEW_TYPE, (leaf) => new AnalysisView(leaf, this));
     this.addRibbonIcon("bar-chart-3", "My Tracker: Open dashboard", () => void this.openDashboard());
     this.addSettingTab(new TrackerSettingTab(this));
@@ -42,6 +44,9 @@ export default class MyTrackerPlugin extends Plugin implements TrackerHost {
     const cmd = (id: string, name: string, fn: () => void | Promise<void>, needsSetup = true) =>
       this.addCommand({ id, name, callback: () => { if (needsSetup && !this.ensureReady()) return; void fn(); } });
     cmd("track-activity", "Track Activity", () => this.openTrack());
+    cmd("open-calendar", "Open calendar", () => this.openCalendar());
+    cmd("schedule-task", "Schedule a task", () => this.openTrack(undefined, { status: "scheduled" }));
+    cmd("scheduled-tasks", "Show scheduled tasks", () => this.openScheduled());
     cmd("open-dashboard", "Open dashboard", () => this.openDashboard());
     cmd("open-analysis", "Open analysis (Advanced dashboard)", () => this.openAnalysis());
     cmd("quick-query", "Ask a question (e.g. “Math this month”)", () => new QueryModal(this).open());
@@ -78,7 +83,19 @@ export default class MyTrackerPlugin extends Plugin implements TrackerHost {
     return { weekStartsOn: this.settings.weekStartsOn, installDate: first && first < this.settings.installDate ? first : this.settings.installDate };
   }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); this.refreshViews(); }
-  openTrack(event?: TrackerEvent): void { if (this.ensureReady()) new TrackModal(this, event).open(); }
+  openTrack(event?: TrackerEvent, init?: TrackInit): void { if (this.ensureReady()) new TrackModal(this, event, init).open(); }
+  openScheduled(): void { void this.openCalendar(undefined, "scheduled"); }
+  async openCalendar(date?: string, filter?: "all" | "scheduled" | "completed"): Promise<void> {
+    const ws = this.app.workspace;
+    const state: Record<string, unknown> = {};
+    if (date && isDateKey(date)) state.date = date;
+    if (filter) { state.mode = "list"; state.filter = filter; }
+    const existing = ws.getLeavesOfType(CALENDAR_VIEW_TYPE)[0];
+    if (existing) { await existing.setViewState({ type: CALENDAR_VIEW_TYPE, state, active: true }); void ws.revealLeaf(existing); return; }
+    const leaf = ws.getLeaf("tab");
+    await leaf.setViewState({ type: CALENDAR_VIEW_TYPE, state, active: true });
+    void ws.revealLeaf(leaf);
+  }
   openDrill(title: string, query: () => TrackerEvent[]): void { new DrillModal(this, title, query).open(); }
   openImport(): void { new ImportModal(this, (rep, name) => this.afterImport(rep, name)).open(); }
 
@@ -87,6 +104,7 @@ export default class MyTrackerPlugin extends Plugin implements TrackerHost {
     this.refreshTimer = window.setTimeout(() => {
       this.refreshTimer = null;
       for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) { const view = leaf.view; if (view instanceof DashboardView) view.refresh(); }
+      for (const leaf of this.app.workspace.getLeavesOfType(CALENDAR_VIEW_TYPE)) { const view = leaf.view; if (view instanceof CalendarView) view.refresh(); }
     }, 120);
   }
 
@@ -159,12 +177,12 @@ export default class MyTrackerPlugin extends Plugin implements TrackerHost {
     await ensureFolder(this.app.vault.adapter, dir);
     let path = `${dir}/export-${stamp(this.now())}.${kind}`;
     for (let i = 1; await this.io.exists(path); i++) path = `${dir}/export-${stamp(this.now())}-${i}.${kind}`;
-    await this.io.write(path, kind === "json" ? JSON.stringify(buildBundle(this.store.list(), this.settings, this.now()), null, 1) : eventsToCsv(this.store.list()));
+    await this.io.write(path, kind === "json" ? JSON.stringify(buildBundle(this.store.listAll(), this.settings, this.now()), null, 1) : eventsToCsv(this.store.listAll()));
     new Notice(`Exported ${this.store.size} events to ${path}`);
   }
   private async syncTreeWithEvents(): Promise<void> {
     let created = 0;
-    for (const e of this.store.list()) created += ensurePath(this.settings.tree, e.path).length;
+    for (const e of this.store.listAll()) created += ensurePath(this.settings.tree, e.path).length;
     if (created) await this.saveSettings();
   }
   private async afterImport(rep: ImportReport, source: string): Promise<void> {

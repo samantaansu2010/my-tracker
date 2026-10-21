@@ -1,3 +1,10 @@
+## Unreleased
+
+- Add a Calendar workspace with Day, Week, Month, and List views.
+- Separate scheduled tasks from completed activity so planned time is excluded from actual-time analytics.
+- Preserve scheduled tasks in JSON backups and exports, including a status column in CSV.
+- Add calendar navigation and a dashboard shortcut. This work is not released yet.
+
 # Changelog
 
 ## 0.1.2 — 2026-10-11
